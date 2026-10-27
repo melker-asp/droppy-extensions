@@ -1,0 +1,136 @@
+<div align="center">
+
+<img src="./assets/store-icon.png" width="96" height="96" alt="The Clip Store" />
+
+<br />
+
+<img src="./assets/title.png" height="48" alt="The Clip Store" />
+
+<p>The Store for <strong><a href="https://getopenclip.app">OpenClip</a></strong>, as a repository.</p>
+
+<br />
+
+<img src="./assets/banner.png" alt="The Clip Store Banner" width="640" />
+
+<br />
+<br />
+
+<p align="center">
+  <a href="https://getopenclip.app"><img src="https://img.shields.io/badge/Get%20OpenClip-212124?style=for-the-badge&logo=apple&logoColor=white" alt="Get OpenClip" /></a>
+  <a href="https://getopenclip.app/extensions"><img src="https://img.shields.io/badge/Browse%20the%20Store-212124?style=for-the-badge&logo=safari&logoColor=white" alt="Browse the Store" /></a>
+  <a href="AGENTS.md"><img src="https://img.shields.io/badge/Author%20an%20Extension-212124?style=for-the-badge&logo=terminal&logoColor=white" alt="Author an Extension" /></a>
+</p>
+<p align="center">
+  <a href="https://github.com/ganeshmshetty/openclip"><img src="https://img.shields.io/badge/Read%20the%20Docs-212124?style=for-the-badge&logo=readme&logoColor=white" alt="Read the Docs" /></a>
+  <a href="https://discord.gg/sy4MeFxf8"><img src="https://img.shields.io/badge/Join%20the%20Community-212124?style=for-the-badge&logo=discord&logoColor=white" alt="Join the Community" /></a>
+  <a href="https://getopenclip.app/support"><img src="https://img.shields.io/badge/Sponsor%20OpenClip-212124?style=for-the-badge&logo=githubsponsors&logoColor=EA4AAA" alt="Sponsor OpenClip" /></a>
+</p>
+
+</div>
+
+Every extension in OpenClip's Store lives in this repository, one folder each under `raw/`. Merging a change here is publishing it: the automated pipeline validates the manifest, builds the `.openclipext` package, generates web catalog assets, and publishes it directly to the live [OpenClip Web Store](https://getopenclip.app/extensions) and in-app Store, with no app release in between.
+
+> **Authoring an extension?** Consult **[AGENTS.md](AGENTS.md)** — the single source of truth for the extension manifest schema, runtime contracts, and host capabilities.
+
+---
+
+## Quick Start
+
+Create, test, and validate a new extension in seconds:
+
+```bash
+# 1. Scaffold a new extension
+./scripts/create.sh MyAction --type js
+
+# 2. Test live in OpenClip (copies to ~/.openclip/extensions with hot reload)
+./scripts/install.sh raw/MyAction.openclipext
+
+# 3. Validate manifest schema, script paths, and icons
+./scripts/validate.sh raw/MyAction.openclipext
+```
+
+---
+
+## Design Principles
+
+Every OpenClip extension should feel like a first-class, native macOS feature:
+
+1. **Focused & Single-Purpose**: Do one text action exceptionally well. Complex multi-step operations should be split into distinct actions or a grouped submenu (`type: "group"`).
+2. **Instant & Non-Blocking**: Text transformations must execute in under 50ms. Any asynchronous or network-dependent action must declare `"async": true` and `"loading": true` with a clear progress message so the popup never freezes.
+3. **Privacy by Default**: Selected text belongs to the user. Do not collect analytics, track usage, or transmit user selection data to third-party endpoints unless explicitly required by the action (e.g. translation or URL shortening).
+4. **Native macOS Look & Feel**: Use Apple SF Symbols wherever possible. Match standard macOS typography and concise action titles.
+
+---
+
+## Quality & Manifest Guidelines
+
+Extensions live in `raw/<Name>.openclipext/` with an `openclip.json` manifest. All extensions must adhere to the following standards:
+
+### 1. Identity & Versioning
+- **Identifier**: Must use a lowercase reverse-DNS format (e.g. `com.openclip.rot13` or `com.author.packagename`).
+- **Semantic Versioning**: Start at `1.0.0`. Every PR modifying an existing extension must bump the version number (`1.0.1`, `1.1.0`, etc.).
+- **Compatibility**: If using modern host APIs (like `openclip.pasteboard`), declare `"minOpenClipVersion": "1.3.0"`.
+
+### 2. Localization
+To provide a great experience worldwide, localize user-facing strings (`name`, `description`, action `title`, option labels) using language dictionary objects:
+- Supported language tags: `en` (required baseline), `zh-Hans`, `zh-Hant`, `fr`, `ja`.
+- Keep descriptions under 120 characters, focusing on what the action does to the selection.
+
+### 3. Icon Standards
+- **Preferred**: Standard Apple SF Symbol name (e.g. `"wand.and.stars"`, `"text.alignleft"`, `"character.bubble"`).
+- **Custom SVG**: If an SF Symbol does not fit, provide an `icon.svg` inside the package folder. SVGs must be monochrome, clean vector paths, with a square viewBox (`16x16` or `32x32`).
+
+### 4. Choosing the Right Runtime
+- **`url`**: Best for search engines, map lookups, web translation, and URL schemes. Requires zero code.
+- **`javascript`**: Best for text transformations, regex formatting, REST APIs (`openclip.fetch`), and clipboard manipulation (`openclip.pasteboard`). Runs in macOS JavaScriptCore.
+- **`shell`**: Best for Unix CLI pipes, formatters, and scripts (`jq`, `curl`, `python3`). Runs without TCC automation prompts.
+- **`applescript`**: Use only when controlling external macOS applications (e.g. Apple Notes, Reminders, Finder). Note that app automation may trigger macOS Automation (TCC) permission dialogs.
+
+### 5. Security & Isolation
+- Network requests in JavaScript must use `openclip.fetch(url, options)`. Requests to private networks, loopback addresses, and link-local IPs (SSRF protection) are blocked by the host.
+- Script paths must stay strictly within the extension folder (no absolute paths or `../` path traversal).
+
+### 6. Documentation (`README.md`)
+Every extension folder must include a concise, standalone `README.md` written for end users. **This file is displayed directly on the OpenClip Web Store / extension page**, so:
+- **Write for end users**: Explain what the extension does, supported apps/features, clear usage examples, and configurable options.
+- **Do not include repository-internal instructions**: Never include repo-specific setup commands (such as `git clone`, `./scripts/install.sh`, or `./scripts/create.sh`), as visitors browsing the store cannot run them.
+- **Keep it small and clean**: Use concise bullet points and standard markdown headings (`## Features`, `## Usage Examples`, `## Configuration`).
+
+---
+
+## Tooling & Validation
+
+Use the repository scripts under `scripts/` to create, test, and validate extensions:
+
+```bash
+# Scaffold a new extension
+./scripts/create.sh Action --type js
+
+# Test live in OpenClip (copies to ~/.openclip/extensions with ~2s hot reload)
+./scripts/install.sh raw/Action.openclipext
+
+# Validate manifest schema, script paths, and icons
+./scripts/validate.sh raw/Action.openclipext
+
+# Verify entire catalog
+./scripts/validate.sh --all
+```
+
+---
+
+## Submitting Extensions
+
+1. Fork this repository.
+2. Add your extension folder under `raw/<Name>.openclipext/`.
+3. Include a concise `README.md` inside `raw/<Name>.openclipext/` explaining its functionality and usage.
+4. Verify that `./scripts/validate.sh raw/<Name>.openclipext` passes with zero errors.
+5. Test that the action works as expected in OpenClip via `./scripts/install.sh`.
+6. Open a Pull Request.
+
+All pull requests run automated CI validation (`validate-pr.yml`). Once merged, your extension is automatically built, released, and published to the live OpenClip store.
+
+---
+
+## License
+
+The OpenClip Extension Catalog and all extensions contributed here are released under the [MIT License](LICENSE). Copyright (c) 2026 Ganesh M and OpenClip Contributors.

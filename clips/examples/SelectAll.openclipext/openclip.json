@@ -1,0 +1,33 @@
+{
+  "identifier": "com.openclip.selectall",
+  "name": {
+    "en": "Select All",
+    "zh-Hans": "全选",
+    "zh-Hant": "全選",
+    "ja": "すべて選択",
+    "fr": "Tout sélectionner"
+  },
+  "version": "1.2.0",
+  "minOpenClipVersion": "1.0.0",
+  "author": "OpenClip Team",
+  "description": {
+    "en": "Select all content in the current application.",
+    "zh-Hans": "全选当前应用程序中的所有内容。",
+    "zh-Hant": "全選目前應用程式中的所有內容。",
+    "ja": "現在のアプリケーションですべてのコンテンツを選択します。",
+    "fr": "Sélectionner tout le contenu dans l'application active."
+  },
+  "action": {
+    "title": {
+      "en": "Select All",
+      "zh-Hans": "全选",
+      "zh-Hant": "全選",
+      "ja": "すべて選択",
+      "fr": "Tout sélectionner"
+    },
+    "icon": "icon.svg",
+    "type": "keypress",
+    "keyPress": "command+a",
+    "requirements": { "input": "optional" }
+  }
+}

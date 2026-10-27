@@ -1,0 +1,152 @@
+{
+  "activation" : {
+    "active" : true,
+    "error" : null
+  },
+  "activity" : [
+
+  ],
+  "artwork" : {
+    "creatorAvatar" : "ok",
+    "icon" : "ok"
+  },
+  "capabilities" : {
+    "declared" : [
+      "network-client",
+      "hud",
+      "shelf-read",
+      "shelf-write",
+      "lock-screen"
+    ],
+    "granted" : [
+      "hud",
+      "lock-screen",
+      "network-client",
+      "shelf-read",
+      "shelf-write"
+    ]
+  },
+  "droplet" : {
+    "capabilities" : [
+      "network-client",
+      "hud",
+      "shelf-read",
+      "shelf-write",
+      "lock-screen"
+    ],
+    "category" : "Productivity",
+    "creator" : "Melker Asp",
+    "icon" : "Todoist.icon",
+    "id" : "todoist",
+    "kit" : {
+      "abi" : 1,
+      "minAPI" : "1.19.0"
+    },
+    "minAppVersion" : "16.0.1",
+    "name" : "Todoist",
+    "summary" : "Dagens uppgifter på hyllan, påminnelser i notchen",
+    "surfaces" : [
+      "shelf-widget",
+      "live-activity",
+      "hud",
+      "settings-pane",
+      "lock-screen-status"
+    ],
+    "typeID" : "todoist",
+    "version" : "1.1.1"
+  },
+  "expandedSurfaces" : [
+
+  ],
+  "harness" : {
+    "abi" : 1,
+    "apiVersion" : "1.20.1"
+  },
+  "liveActivity" : {
+    "publishing" : false,
+    "seat" : "none(idle)"
+  },
+  "lockScreen" : {
+    "publishing" : true
+  },
+  "log" : [
+
+  ],
+  "manifest" : {
+    "loaded" : true,
+    "path" : "\/Users\/melkerasp\/dev\/droppy\/droplets\/todoist\/droplet.json",
+    "problem" : null
+  },
+  "problems" : [
+
+  ],
+  "schema" : "droppykit-harness-report\/1",
+  "shelfWidgets" : [
+    {
+      "contentHeight" : "fixed(283.0)",
+      "id" : "today",
+      "preferredPairedWidth" : 220,
+      "preferredSoloWidth" : 440,
+      "systemImage" : "checkmark.circle",
+      "title" : "Todoist"
+    }
+  ],
+  "shots" : [
+    "\/Users\/melkerasp\/dev\/droppy\/droplets\/todoist\/shots\/overview.png",
+    "\/Users\/melkerasp\/dev\/droppy\/droplets\/todoist\/shots\/shelf-widget.png",
+    "\/Users\/melkerasp\/dev\/droppy\/droplets\/todoist\/shots\/live-activity.png",
+    "\/Users\/melkerasp\/dev\/droppy\/droplets\/todoist\/shots\/hud.png",
+    "\/Users\/melkerasp\/dev\/droppy\/droplets\/todoist\/shots\/expanded-surface.png",
+    "\/Users\/melkerasp\/dev\/droppy\/droplets\/todoist\/shots\/settings-pane.png",
+    "\/Users\/melkerasp\/dev\/droppy\/droplets\/todoist\/shots\/lock-screen.png",
+    "\/Users\/melkerasp\/dev\/droppy\/droplets\/todoist\/shots\/menu-bar.png",
+    "\/Users\/melkerasp\/dev\/droppy\/droplets\/todoist\/shots\/capabilities.png",
+    "\/Users\/melkerasp\/dev\/droppy\/droplets\/todoist\/shots\/preferences.png",
+    "\/Users\/melkerasp\/dev\/droppy\/droplets\/todoist\/shots\/activity.png"
+  ],
+  "surfaces" : [
+    {
+      "declared" : true,
+      "implemented" : true,
+      "surface" : "shelf-widget",
+      "verdict" : "provided"
+    },
+    {
+      "declared" : true,
+      "implemented" : true,
+      "surface" : "live-activity",
+      "verdict" : "provided"
+    },
+    {
+      "declared" : false,
+      "implemented" : false,
+      "surface" : "expanded-surface",
+      "verdict" : "not-provided"
+    },
+    {
+      "declared" : true,
+      "implemented" : true,
+      "surface" : "settings-pane",
+      "verdict" : "provided"
+    },
+    {
+      "declared" : true,
+      "implemented" : true,
+      "surface" : "hud",
+      "verdict" : "provided"
+    },
+    {
+      "declared" : true,
+      "implemented" : true,
+      "surface" : "lock-screen-status",
+      "verdict" : "provided"
+    },
+    {
+      "declared" : false,
+      "implemented" : false,
+      "surface" : "menu-bar-extra",
+      "verdict" : "not-provided"
+    }
+  ],
+  "verdict" : "ok"
+}

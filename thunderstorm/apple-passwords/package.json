@@ -1,0 +1,86 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "apple-passwords",
+  "title": "Lösenord",
+  "description": "Hämta lösenord och engångskoder från Apples Lösenord via apw, och spara nya konton.",
+  "icon": "icon.png",
+  "author": "melkerasp",
+  "categories": [
+    "Security"
+  ],
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "search-passwords",
+      "title": "Sök lösenord",
+      "subtitle": "Lösenord",
+      "description": "Hitta kontona för en webbplats och klistra in eller kopiera lösenordet.",
+      "mode": "view",
+      "keywords": [
+        "password",
+        "lösen",
+        "apw",
+        "keychain",
+        "nyckelring"
+      ]
+    },
+    {
+      "name": "one-time-codes",
+      "title": "Engångskoder",
+      "subtitle": "Lösenord",
+      "description": "Hämta tvåstegskoden för en webbplats.",
+      "mode": "view",
+      "keywords": [
+        "otp",
+        "2fa",
+        "totp",
+        "kod",
+        "verifiering"
+      ]
+    },
+    {
+      "name": "save-password",
+      "title": "Spara lösenord",
+      "subtitle": "Lösenord",
+      "description": "Lägg till ett konto i Lösenord, eller byt lösenordet på ett du redan har.",
+      "mode": "view",
+      "keywords": [
+        "new password",
+        "nytt lösenord",
+        "generera"
+      ]
+    }
+  ],
+  "preferences": [
+    {
+      "name": "primaryAction",
+      "title": "Retur",
+      "description": "Vad Retur gör med ett lösenord eller en kod. ⌘ Retur gör det andra.",
+      "type": "dropdown",
+      "required": false,
+      "default": "paste",
+      "data": [
+        {
+          "title": "Klistra in i appen framför",
+          "value": "paste"
+        },
+        {
+          "title": "Kopiera",
+          "value": "copy"
+        }
+      ]
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.100.0",
+    "@raycast/utils": "^1.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "typescript": "^5.6.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

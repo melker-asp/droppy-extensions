@@ -1,0 +1,34 @@
+{
+  "identifier": "com.openclip.charactercount",
+  "name": {
+    "en": "Character Count",
+    "zh-Hans": "字符计数",
+    "zh-Hant": "字元計數",
+    "ja": "文字数カウント",
+    "fr": "Nombre de caractères"
+  },
+  "version": "1.2.0",
+  "minOpenClipVersion": "1.0.0",
+  "author": "OpenClip Team",
+  "description": {
+    "en": "Count the characters in the selected text.",
+    "zh-Hans": "统计选中文本中的字符数。",
+    "zh-Hant": "統計選取文字中的字元數。",
+    "ja": "選択したテキストの文字数をカウントします。",
+    "fr": "Compte les caractères du texte sélectionné."
+  },
+  "action": {
+    "title": {
+      "en": "Character Count",
+      "zh-Hans": "字符计数",
+      "zh-Hant": "字元計數",
+      "ja": "文字数カウント",
+      "fr": "Nombre de caractères"
+    },
+    "icon": "icon.svg",
+    "type": "javascript",
+    "script": "main.js",
+    "inline": true,
+    "output": "text"
+  }
+}

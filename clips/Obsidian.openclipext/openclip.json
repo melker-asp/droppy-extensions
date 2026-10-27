@@ -1,0 +1,87 @@
+{
+  "identifier": "com.melkerasp.obsidian",
+  "name": "Obsidian",
+  "description": "Skicka markerad text till ditt Obsidian-valv: dagens anteckning, en ny anteckning i inkorgen eller en sökning.",
+  "version": "1.0.0",
+  "author": "Melker Asp",
+  "keywords": [
+    "obsidian",
+    "anteckning",
+    "anteckningar",
+    "valv",
+    "dagbok",
+    "dagens",
+    "inkorg",
+    "fånga",
+    "spara",
+    "sök"
+  ],
+  "actions": [
+    {
+      "id": "obsidian",
+      "title": "Obsidian",
+      "icon": "symbol(square.and.pencil)",
+      "type": "group",
+      "requirements": {
+        "input": "text"
+      },
+      "subActions": [
+        {
+          "id": "dagens",
+          "title": "Till dagens anteckning",
+          "icon": "symbol(calendar)",
+          "type": "script",
+          "script": "dagens.sh",
+          "output": "none",
+          "keywords": [
+            "dagens",
+            "dagbok",
+            "daily",
+            "idag",
+            "fånga",
+            "capture",
+            "journal"
+          ],
+          "requirements": {
+            "input": "text"
+          }
+        },
+        {
+          "id": "ny",
+          "title": "Ny anteckning i inkorgen",
+          "icon": "symbol(square.and.pencil)",
+          "type": "script",
+          "script": "ny.sh",
+          "output": "none",
+          "keywords": [
+            "ny",
+            "anteckning",
+            "inkorg",
+            "inbox",
+            "skapa",
+            "note"
+          ],
+          "requirements": {
+            "input": "text"
+          }
+        },
+        {
+          "id": "sok",
+          "title": "Sök i valvet",
+          "icon": "symbol(magnifyingglass)",
+          "type": "url",
+          "url": "obsidian://search?query={text}",
+          "keywords": [
+            "sök",
+            "sökning",
+            "hitta",
+            "search"
+          ],
+          "requirements": {
+            "input": "text"
+          }
+        }
+      ]
+    }
+  ]
+}

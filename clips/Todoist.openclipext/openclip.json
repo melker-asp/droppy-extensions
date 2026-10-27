@@ -1,0 +1,63 @@
+{
+  "identifier": "com.melkerasp.todoist",
+  "name": "Todoist",
+  "description": "Gör markerad text till en uppgift i Todoist, med en länk tillbaka till sidan eller mejlet den kom ifrån. Kräver Todoist-dropleten i Droppy.",
+  "version": "1.1.0",
+  "author": "Melker Asp",
+  "minDropClipVersion": "2.0.0",
+  "keywords": [
+    "todoist",
+    "uppgift",
+    "att göra",
+    "todo",
+    "task",
+    "påminnelse"
+  ],
+  "actions": [
+    {
+      "id": "todoist",
+      "title": "Todoist",
+      "icon": "symbol(checkmark.circle)",
+      "type": "group",
+      "subActions": [
+        {
+          "id": "todoist-edit",
+          "title": "Lägg till…",
+          "icon": "symbol(plus.circle)",
+          "type": "script",
+          "script": "edit.sh",
+          "output": "none",
+          "keywords": [
+            "lägg till",
+            "ny uppgift",
+            "add"
+          ]
+        },
+        {
+          "id": "todoist-today",
+          "title": "Idag",
+          "icon": "symbol(star)",
+          "type": "script",
+          "script": "today.sh",
+          "output": "none",
+          "keywords": [
+            "idag",
+            "today"
+          ]
+        },
+        {
+          "id": "todoist-tomorrow",
+          "title": "Imorgon",
+          "icon": "symbol(sun.max)",
+          "type": "script",
+          "script": "tomorrow.sh",
+          "output": "none",
+          "keywords": [
+            "imorgon",
+            "tomorrow"
+          ]
+        }
+      ]
+    }
+  ]
+}

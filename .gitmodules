@@ -1,0 +1,12 @@
+[submodule "droplets/droppykit"]
+	path = droplets/droppykit
+	url = https://gitlab.com/droppyformac1/droppykit.git
+[submodule "reference/droplet-store"]
+	path = reference/droplet-store
+	url = https://gitlab.com/droppyformac1/droplets.git
+[submodule "tools/apw"]
+	path = tools/apw
+	url = https://github.com/bendews/apw
+[submodule "droplets/sums"]
+	path = droplets/sums
+	url = https://github.com/melker-asp/sums-droplet.git

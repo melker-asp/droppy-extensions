@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# SwiftPM / droplet builds (rebuilt with droppykit build)
+.build/
+.swiftpm/
+*.droplet
+
+# Node
+node_modules/
+
+# Local secrets, never committed
+.env
+.env.*

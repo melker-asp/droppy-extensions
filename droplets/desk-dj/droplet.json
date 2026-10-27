@@ -1,0 +1,33 @@
+{
+  "id": "desk-dj",
+  "name": "Desk DJ",
+  "version": "1.0.0",
+  "summary": "A tiny ambient mixer for your notch",
+  "description": "Desk DJ is a small, file-free ambient mixer for focus. Blend rain, cafe murmur, a fireplace, brown noise and a soft drift tone from the shelf, then open the notch mixer for precise levels.\n\nYour mix is saved automatically and keeps playing while you work.",
+  "category": "Media",
+  "kit": {
+    "abi": 1,
+    "minAPI": "1.6.0"
+  },
+  "minAppVersion": "15.3.0",
+  "capabilities": [
+    "shelf-write",
+    "expanded-surface"
+  ],
+  "surfaces": [
+    "shelf-widget",
+    "expanded-surface"
+  ],
+  "icon": "DeskDj.icon",
+  "creator": {
+    "name": "Your name",
+    "kind": "community",
+    "url": "https://example.com",
+    "avatar": "Creator.png"
+  },
+  "source": {
+    "repository": "https://github.com/you/desk-dj",
+    "license": "MIT"
+  },
+  "keywords": ["ambient", "sound", "focus", "rain", "noise", "mixer"]
+}

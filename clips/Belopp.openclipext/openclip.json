@@ -1,0 +1,81 @@
+{
+  "identifier": "com.melkerasp.belopp",
+  "name": "Belopp",
+  "description": "Summera markerade belopp, räkna moms och växla valuta med Riksbankens kurs på fakturadatumet.",
+  "version": "1.0.0",
+  "author": "Melker Asp",
+  "keywords": ["belopp", "summa", "summera", "moms", "valuta", "växelkurs", "riksbanken", "faktura", "ekonomi", "kronor"],
+  "options": [
+    {
+      "identifier": "format",
+      "label": "Kopiera som",
+      "type": "multiple",
+      "default": "Excel: 12345,50",
+      "values": ["Excel: 12345,50", "Text: 12 345,50"]
+    }
+  ],
+  "actions": [
+    {
+      "id": "belopp",
+      "title": "Belopp",
+      "icon": "symbol(banknote)",
+      "type": "group",
+      "requirements": { "regex": "\\d" },
+      "subActions": [
+        {
+          "id": "summera",
+          "title": "Summera",
+          "icon": "symbol(sum)",
+          "type": "javascript",
+          "script": "summera.js",
+          "inline": true,
+          "output": "text",
+          "result": "copy",
+          "keywords": ["summa", "summera", "total", "addera", "sum"],
+          "requirements": { "regex": "\\d" }
+        },
+        {
+          "id": "moms",
+          "title": "Moms",
+          "icon": "symbol(percent)",
+          "type": "javascript",
+          "script": "moms.js",
+          "output": "text",
+          "result": "preview",
+          "keywords": ["moms", "vat", "mervärdesskatt", "exkl", "inkl"],
+          "requirements": { "regex": "\\d" },
+          "options": [
+            {
+              "identifier": "rate",
+              "label": "Momssats när markeringen inte anger någon",
+              "type": "multiple",
+              "default": "25",
+              "values": ["25", "12", "6"]
+            }
+          ]
+        },
+        {
+          "id": "valuta",
+          "title": "Valuta",
+          "icon": "symbol(arrow.left.arrow.right)",
+          "type": "javascript",
+          "script": "valuta.js",
+          "async": true,
+          "output": "dynamic",
+          "result": "copy",
+          "keywords": ["valuta", "växla", "växelkurs", "riksbanken", "eur", "usd", "currency"],
+          "requirements": { "regex": "\\d" },
+          "options": [
+            {
+              "identifier": "target",
+              "label": "Valuta för SEK-belopp",
+              "type": "multiple",
+              "default": "EUR",
+              "values": ["EUR", "USD", "GBP", "NOK", "DKK", "CHF", "JPY", "CNY", "PLN", "CAD", "AUD"]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "id": "todoist",
+  "name": "Todoist",
+  "version": "1.1.1",
+  "summary": "Dagens uppgifter på hyllan, påminnelser i notchen",
+  "description": "Todoist lägger dagens uppgifter på hyllan, grupperade i försenat, idag och kommande, med hur många du har klarat. Bocka av där de står, skjut en uppgift till imorgon, ändra prioritet eller växla till en matris över dina P1–P4.\n\nSkriv nya uppgifter i fältet överst. Raden under visar projekt, datum och prioritet; klicka på en del för att ändra den.\n\nInnan en uppgift med klockslag visas nedräkningen bredvid notchen, och låsskärmen visar hur många som är kvar idag.\n\nMed Todoist-clipet i DropClip blir markerad text från vilken app som helst en uppgift, med en länk tillbaka till sidan eller mejlet den kom ifrån.\n\nAnslut med din API-token från Todoist. Den sparas i nyckelringen och skickas bara till Todoist.",
+  "category": "Productivity",
+  "kit": {
+    "abi": 1,
+    "minAPI": "1.19.0"
+  },
+  "minAppVersion": "16.0.1",
+  "capabilities": [
+    "network-client",
+    "hud",
+    "shelf-read",
+    "shelf-write",
+    "lock-screen"
+  ],
+  "surfaces": [
+    "shelf-widget",
+    "live-activity",
+    "hud",
+    "settings-pane",
+    "lock-screen-status"
+  ],
+  "icon": "Todoist.icon",
+  "creator": {
+    "name": "Melker Asp",
+    "kind": "community",
+    "url": "https://github.com/melker-asp",
+    "avatar": "Creator.png"
+  },
+  "source": {
+    "repository": "https://github.com/melker-asp/todoist-droplet",
+    "license": "MIT"
+  },
+  "screenshots": [],
+  "keywords": [
+    "todoist",
+    "tasks",
+    "todo",
+    "uppgifter",
+    "påminnelse",
+    "deadline"
+  ]
+}

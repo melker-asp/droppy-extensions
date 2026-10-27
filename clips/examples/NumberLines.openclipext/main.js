@@ -1,0 +1,8 @@
+function action(selection) {
+    if (!selection) return "";
+    var br = selection.match(/(\r\n|\r|\n)$/);
+    var body = br ? selection.slice(0, -br[1].length) : selection;
+    return body.split(/\r?\n/).map(function(line, idx) {
+        return (idx + 1) + ". " + line;
+    }).join("\n") + (br ? "\n" : "");
+}

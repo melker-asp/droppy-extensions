@@ -1,0 +1,49 @@
+{
+  "id": "speedtest",
+  "name": "Speedtest",
+  "version": "1.0.0",
+  "summary": "Testa nätverkshastigheten med Speedtest by Ookla",
+  "description": "Speedtest by Ookla mäter din internethastighet direkt i notchen och i Thunderstorm.\n\nUnder testet visas aktuell nedladdnings- och uppladdningshastighet i notchens vingar i realtid. På hyllan och i Thunderstorm får du fullständig diagnostik: nedladdning, uppladdning, ping, jitter, paketförlust, din internetleverantör och en officiell länk till Speedtest.net.\n\nKräver den officiella Speedtest CLI från Ookla (installeras enkelt via Homebrew).",
+  "category": "system",
+  "kit": {
+    "abi": 1,
+    "minAPI": "1.19.0"
+  },
+  "minAppVersion": "16.0.1",
+  "capabilities": [
+    "network-client",
+    "hud",
+    "shelf-read",
+    "shelf-write",
+    "clipboard-write"
+  ],
+  "surfaces": [
+    "shelf-widget",
+    "live-activity",
+    "hud",
+    "settings-pane"
+  ],
+  "icon": "Speedtest.icon",
+  "creator": {
+    "name": "Melker Asp",
+    "kind": "community",
+    "url": "https://github.com/melker-asp",
+    "avatar": "Creator.png"
+  },
+  "source": {
+    "repository": "https://github.com/melker-asp/speedtest-droplet",
+    "license": "MIT"
+  },
+  "screenshots": [],
+  "keywords": [
+    "speedtest",
+    "ookla",
+    "hastighet",
+    "internet",
+    "wifi",
+    "bredband",
+    "ping",
+    "bandwidth",
+    "network"
+  ]
+}

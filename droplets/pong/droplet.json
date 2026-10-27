@@ -1,0 +1,33 @@
+{
+  "id": "pong",
+  "name": "Pong",
+  "version": "1.0.0",
+  "summary": "The classic paddle game, played in the notch",
+  "description": "Pong takes the notch over with a court, a ball and a CPU on the other side. Steer your paddle with the pointer or trackpad, click to serve and to pause, and play to 11.\n\nOpen it with Control-Option-P or the Play button on its shelf widget, which also keeps your record against the CPU and lets you pick how good the CPU is.",
+  "category": "Media",
+  "kit": {
+    "abi": 1,
+    "minAPI": "1.6.0"
+  },
+  "minAppVersion": "15.3.0",
+  "capabilities": [
+    "global-shortcuts",
+    "expanded-surface"
+  ],
+  "surfaces": [
+    "shelf-widget",
+    "expanded-surface"
+  ],
+  "icon": "Pong.icon",
+  "creator": {
+    "name": "melker-asp",
+    "kind": "community",
+    "url": "https://github.com/melker-asp",
+    "avatar": "Creator.png"
+  },
+  "source": {
+    "repository": "https://github.com/melker-asp/pong-droplet",
+    "license": "MIT"
+  },
+  "keywords": ["pong", "game", "arcade", "retro", "paddle"]
+}

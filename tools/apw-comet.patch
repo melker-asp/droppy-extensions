@@ -1,0 +1,22 @@
+diff --git a/src/browser.ts b/src/browser.ts
+index 990c32b..437c028 100644
+--- a/src/browser.ts
++++ b/src/browser.ts
+@@ -32,6 +32,7 @@ export const BROWSERS = [
+   browser("edge", "Microsoft Edge", "Microsoft Edge", "Microsoft Edge", "microsoft-edge"),
+   browser("brave", "Brave", "Brave Browser", "BraveSoftware/Brave-Browser", "brave-browser"),
+   browser("chrome", "Google Chrome", "Google Chrome", "Google/Chrome", "google-chrome"),
++  browser("comet", "Comet", "Comet", "Comet", "comet"),
+ ];
+ 
+ function exists(path: string): boolean {
+@@ -47,7 +48,8 @@ function directories(path: string): string[] {
+   try {
+     return [...Deno.readDirSync(path)].filter((entry) => entry.isDirectory).map((entry) => entry.name);
+   } catch (error) {
+-    if (error instanceof Deno.errors.NotFound) return [];
++    // Leftovers of uninstalled browsers can be protected by macOS (EPERM); skip them like missing ones.
++    if (error instanceof Deno.errors.NotFound || error instanceof Deno.errors.PermissionDenied) return [];
+     throw error;
+   }
+ }
