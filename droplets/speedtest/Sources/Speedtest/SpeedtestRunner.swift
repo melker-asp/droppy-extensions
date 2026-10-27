@@ -53,8 +53,16 @@ public final class SpeedtestRunner: ObservableObject {
         }
     }
 
-    /// Blocking; call it off the main actor.
-    nonisolated static func locateBinary() -> String? {
+    /// Picks up a CLI installed since the last look, so a user who follows
+    /// the setup hint gets Ookla's test from Start without "Check again".
+    /// Only the usual install paths: cheap enough to run on every Start.
+    func noticeNewlyInstalledCLI() {
+        guard !isCLIAvailable, let path = Self.binaryAtKnownPath() else { return }
+        cliPath = path
+        isCLIAvailable = true
+    }
+
+    nonisolated static func binaryAtKnownPath() -> String? {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let candidates = [
             "/opt/homebrew/bin/speedtest",
@@ -62,7 +70,12 @@ public final class SpeedtestRunner: ObservableObject {
             "\(home)/.local/bin/speedtest",
             "\(home)/bin/speedtest",
         ]
-        if let path = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    /// Blocking; call it off the main actor.
+    nonisolated static func locateBinary() -> String? {
+        if let path = binaryAtKnownPath() {
             return path
         }
 

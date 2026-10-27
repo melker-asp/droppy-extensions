@@ -119,6 +119,7 @@ public final class SpeedtestDroplet: NSObject, ObservableObject, Droplet, HUDPre
     /// its terms accepted, Apple's when the CLI is missing and the fallback is on.
     public func startTest() {
         guard !runner.state.isRunning else { return }
+        runner.noticeNewlyInstalledCLI()
 
         if isHarness {
             beginRun()
