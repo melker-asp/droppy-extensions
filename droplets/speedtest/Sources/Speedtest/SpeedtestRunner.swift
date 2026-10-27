@@ -41,16 +41,14 @@ public final class SpeedtestRunner: ObservableObject {
     public func refreshCLIStatus() {
         guard !isCheckingCLI else { return }
         isCheckingCLI = true
-        Task.detached(priority: .utility) { [weak self] in
-            let path = Self.locateBinary()
-            await MainActor.run {
-                guard let self else { return }
-                self.cliPath = path
-                self.isCLIAvailable = path != nil
-                self.isCheckingCLI = false
-                if path != nil, self.state == .cliMissing {
-                    self.state = .idle
-                }
+        Task { [weak self] in
+            let path = await Task.detached(priority: .utility) { Self.locateBinary() }.value
+            guard let self else { return }
+            self.cliPath = path
+            self.isCLIAvailable = path != nil
+            self.isCheckingCLI = false
+            if path != nil, self.state == .cliMissing {
+                self.state = .idle
             }
         }
     }
@@ -222,7 +220,7 @@ public final class SpeedtestRunner: ObservableObject {
                 for try await line in stdout.bytes.lines {
                     lines.append(line)
                     if let onLine {
-                        await MainActor.run {
+                        await MainActor.run { [weak self] in
                             guard let self, self.runID == id else { return }
                             onLine(line)
                         }
@@ -236,7 +234,7 @@ public final class SpeedtestRunner: ObservableObject {
             process.waitUntilExit()
             let status = process.terminationStatus
             let output = lines.joined(separator: "\n")
-            await MainActor.run {
+            await MainActor.run { [weak self] in
                 guard let self, self.runID == id else { return }
                 self.currentProcess = nil
                 self.readTask = nil
