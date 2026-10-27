@@ -3,6 +3,20 @@
 A Droplet for [Droppy](https://getdroppy.app), built with
 [DroppyKit](https://getdroppy.app/docs/droppykit).
 
+## Using it
+
+- Install Ookla's Speedtest CLI with Homebrew:
+  `brew tap teamookla/speedtest && brew install speedtest`.
+  Speedtest's settings have the command to copy.
+- The first time you run a test, accept Ookla's license and privacy policy, from the
+  widget or in Speedtest's settings. Speedtest passes your answer on to the CLI.
+- Press play on the Speedtest widget. Download and upload speed show beside the notch
+  while the test runs; the widget keeps the full result.
+- Without the CLI, Speedtest measures with Apple's network test (`networkQuality`,
+  built into macOS) and labels the result as Apple's. You can turn that off in its settings.
+- To start a test from Thunderstorm, add a quicklink to `droppy://droplet/speedtest/run`.
+  `droppy://droplet/speedtest/stop` stops it.
+
 ## Developing
 
 ```bash

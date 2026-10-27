@@ -38,50 +38,41 @@ extension SpeedtestDroplet: LiveActivityProviding {
     public func makeCompanionDetail(context: LiveActivityContext) -> AnyView? { nil }
 }
 
-/// The leading wing: dynamic Apple SF Symbol indicating current test stage
+/// The leading wing: an SF Symbol for the current stage.
 private struct SpeedtestLiveActivityLeading: View {
     @ObservedObject var droplet: SpeedtestDroplet
 
     var body: some View {
-        HStack(spacing: DroppySpacing.xsm) {
-            Image(systemName: iconName)
-                .font(.system(size: DroppyLiveActivityMetrics.iconSize, weight: .semibold))
-                .foregroundStyle(iconColor)
-                .id(iconName)
-                .transition(DroppyTransition.compactContent)
-        }
-        .padding(.trailing, DroppySpacing.xs)
+        Image(systemName: iconName)
+            .font(.system(size: DroppyLiveActivityMetrics.iconSize, weight: .semibold))
+            .foregroundStyle(iconColor)
+            .id(iconName)
+            .transition(DroppyTransition.compactContent)
+            .padding(.trailing, DroppySpacing.xs)
     }
 
     private var iconName: String {
         switch droplet.runner.state {
-        case .preparing:
-            return "antenna.radiowaves.left.and.right"
-        case .ping:
-            return "waveform.path.ecg"
-        case .download:
-            return "arrow.down.circle.fill"
-        case .upload:
-            return "arrow.up.circle.fill"
-        case .completed:
-            return "checkmark.circle.fill"
-        default:
-            return "speedometer"
+        case .preparing: return "antenna.radiowaves.left.and.right"
+        case .ping: return "waveform.path.ecg"
+        case .download: return "arrow.down.circle.fill"
+        case .upload: return "arrow.up.circle.fill"
+        case .completed: return "checkmark.circle.fill"
+        default: return "speedometer"
         }
     }
 
     private var iconColor: Color {
         switch droplet.runner.state {
-        case .download: return .teal
         case .upload: return .blue
         case .completed: return .green
-        case .ping, .preparing: return .teal
+        case .preparing, .ping, .download, .measuring: return .teal
         default: return AdaptiveColors.notchSurfacePrimaryText
         }
     }
 }
 
-/// The trailing wing: live speed or status with monospaced digits
+/// The trailing wing: live speed or status with monospaced digits.
 private struct SpeedtestLiveActivityTrailing: View {
     @ObservedObject var droplet: SpeedtestDroplet
 
@@ -98,18 +89,13 @@ private struct SpeedtestLiveActivityTrailing: View {
 
     private var statusText: String {
         switch droplet.runner.state {
-        case .preparing:
-            return "Ansluter…"
-        case .ping(let latency, _):
-            return "\(String(format: "%.0f", latency)) ms"
-        case .download(let mbps, _):
-            return "↓ \(SpeedtestResult.formattedSpeed(mbps))"
-        case .upload(let mbps, _):
-            return "↑ \(SpeedtestResult.formattedSpeed(mbps))"
-        case .completed(let result):
-            return "↓ \(SpeedtestResult.formattedSpeed(result.downloadMbps))"
-        default:
-            return ""
+        case .preparing: return "Connecting…"
+        case .measuring: return "Testing…"
+        case .ping(let latency, _): return "\(String(format: "%.0f", latency)) ms"
+        case .download(let mbps, _): return "↓ \(SpeedtestResult.formattedSpeed(mbps))"
+        case .upload(let mbps, _): return "↑ \(SpeedtestResult.formattedSpeed(mbps))"
+        case .completed(let result): return "↓ \(SpeedtestResult.formattedSpeed(result.downloadMbps))"
+        default: return ""
         }
     }
 }
@@ -123,8 +109,10 @@ extension SpeedtestDroplet: SettingsPaneProviding {
 
     public var settingsSearchEntries: [SettingsSearchEntry] {
         [
-            SettingsSearchEntry(title: "Speedtest CLI", keywords: ["ookla", "cli", "installera", "terminal", "brew"]),
-            SettingsSearchEntry(title: "Mätningar", keywords: ["hastighet", "ping", "bredband", "wifi", "mbps", "nätverk"])
+            SettingsSearchEntry(title: "Speedtest CLI", keywords: ["ookla", "cli", "install", "terminal", "brew", "homebrew"]),
+            SettingsSearchEntry(title: "Ookla's terms", keywords: ["license", "licence", "privacy", "gdpr", "eula"]),
+            SettingsSearchEntry(title: "Apple's network test", keywords: ["networkquality", "fallback", "responsiveness", "rpm"]),
+            SettingsSearchEntry(title: "Notifications", keywords: ["hud", "speed", "ping", "mbps", "network"]),
         ]
     }
 }
@@ -135,82 +123,93 @@ private struct SpeedtestSettings: View {
     var body: some View {
         DropletSettingsPane {
             DropletSettingsSection {
-                settingsSectionHeader("Ookla Speedtest CLI")
+                settingsSectionHeader("Speedtest CLI")
             } content: {
                 DropletSettingsCard {
-                    if droplet.runner.isCLIAvailable, let path = droplet.runner.cliPath {
-                        DropletControlRow(title: "Installerad och redo") {
-                            HStack(spacing: DroppySpacing.sm) {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .foregroundStyle(.green)
-                                DropletValuePill(text: path)
-                            }
+                    cliRow
+                }
+            }
+
+            DropletSettingsSection {
+                settingsSectionHeader("Ookla's terms")
+            } content: {
+                DropletSettingsCard {
+                    DropletToggleRow(
+                        title: "Accept Ookla's license and privacy policy",
+                        subtitle: "Ookla's CLI asks for this before its first test. Speedtest passes your answer on each time it runs it.",
+                        isOn: $droplet.termsAccepted
+                    )
+                    DropletStackedRow(title: "Read them on speedtest.net") {
+                        HStack(spacing: DroppySpacing.md) {
+                            Link("License", destination: SpeedtestDroplet.ooklaEULA)
+                            Link("Terms of use", destination: SpeedtestDroplet.ooklaTerms)
+                            Link("Privacy policy", destination: SpeedtestDroplet.ooklaPrivacy)
                         }
-                    } else {
-                        DropletStackedRow(
-                            title: "CLI saknas",
-                            infoTip: "Speedtest by Ookla kräver det officiella CLI-verktyget för att köra skarpa mätningar."
-                        ) {
-                            VStack(alignment: .leading, spacing: DroppySpacing.sm) {
-                                Text("För att köra mätningar installerar du Ooklas CLI i Terminalen med Homebrew:")
-                                    .font(.callout)
-                                    .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-
-                                HStack(spacing: DroppySpacing.sm) {
-                                    Text("brew install speedtest")
-                                        .font(.system(.callout, design: .monospaced))
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(AdaptiveColors.notchSurfaceCardFill)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                                    Button("Kopiera kommando") {
-                                        droplet.copyBrewInstallCommand()
-                                    }
-                                    .buttonStyle(.borderedProminent)
-
-                                    Button("Kontrollera igen") {
-                                        droplet.runner.refreshCLIStatus()
-                                    }
-                                    .buttonStyle(.bordered)
-                                }
-
-                                Link(
-                                    "Läs mer på speedtest.net/apps/cli",
-                                    destination: URL(string: "https://www.speedtest.net/apps/cli")!
-                                )
-                                .font(.callout)
-                            }
-                        }
+                        .font(.callout)
                     }
                 }
             }
 
             DropletSettingsSection {
-                settingsSectionHeader("Notiser & Feedback")
+                settingsSectionHeader("Without Ookla's CLI")
             } content: {
                 DropletSettingsCard {
                     DropletToggleRow(
-                        title: "Visa HUD-notis när mätningen är klar",
-                        subtitle: "Visar en diskret notis med sammanfattning av ned- och uppladdning.",
-                        isOn: $droplet.showHUDOnComplete
+                        title: "Use Apple's network test",
+                        subtitle: "Measures with networkQuality, built into macOS, when Ookla's CLI isn't installed. Results come from Apple's servers, not Ookla's.",
+                        isOn: $droplet.useAppleFallback
                     )
                 }
             }
 
             DropletSettingsSection {
-                settingsSectionHeader("Test & Simulering")
+                settingsSectionHeader("Notifications")
             } content: {
                 DropletSettingsCard {
-                    DropletControlRow(
-                        title: "Simulerat test",
-                        infoTip: "Kör en snabb animerad mätning för att prova notchen och hyllan utan CLI."
-                    ) {
-                        Button("Kör test") {
-                            droplet.startSimulatedTest()
+                    DropletToggleRow(
+                        title: "Show a HUD when a test finishes",
+                        subtitle: "A short summary of download and upload speed by the notch.",
+                        isOn: $droplet.showHUDOnComplete
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var cliRow: some View {
+        if droplet.runner.isCLIAvailable, let path = droplet.runner.cliPath {
+            DropletControlRow(title: "Installed") {
+                DropletValuePill(text: path)
+            }
+        } else {
+            DropletStackedRow(
+                title: droplet.runner.isCheckingCLI ? "Looking for Ookla's CLI…" : "Not installed",
+                infoTip: "Speedtest runs Ookla's official command-line tool. Install it with Homebrew."
+            ) {
+                VStack(alignment: .leading, spacing: DroppySpacing.sm) {
+                    Text("Paste this in Terminal to install it with Homebrew:")
+                        .font(.callout)
+                        .foregroundStyle(AdaptiveColors.secondaryTextAuto)
+
+                    Text(SpeedtestDroplet.installCommand)
+                        .font(.system(.callout, design: .monospaced))
+                        .textSelection(.enabled)
+
+                    HStack(spacing: DroppySpacing.sm) {
+                        Button("Copy command") {
+                            droplet.copyInstallCommand()
                         }
-                        .buttonStyle(.bordered)
-                        .disabled(droplet.runner.state.isRunning)
+                        .buttonStyle(DroppyAccentButtonStyle(size: .small))
+
+                        Button("Check again") {
+                            droplet.runner.refreshCLIStatus()
+                        }
+                        .buttonStyle(DroppyQuietButtonStyle(size: .small))
+                        .disabled(droplet.runner.isCheckingCLI)
+
+                        Link("About the CLI", destination: SpeedtestDroplet.ooklaCLIPage)
+                            .font(.callout)
                     }
                 }
             }

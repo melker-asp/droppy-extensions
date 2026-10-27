@@ -2,7 +2,8 @@
 //  SpeedtestRunner.swift
 //  Speedtest
 //
-//  Process runner for Ookla Speedtest CLI with streaming JSON parsing.
+//  Runs Ookla's Speedtest CLI (streaming JSON) or Apple's networkQuality
+//  (one JSON object at the end) and turns their output into SpeedtestState.
 //
 
 import Combine
@@ -10,81 +11,90 @@ import Foundation
 
 @MainActor
 public final class SpeedtestRunner: ObservableObject {
-    @Published public private(set) var state: SpeedtestState = .idle
+    @Published public internal(set) var state: SpeedtestState = .idle
     @Published public private(set) var cliPath: String?
     @Published public private(set) var isCLIAvailable: Bool = false
+    @Published public private(set) var isCheckingCLI: Bool = false
+    /// The last download speed of the run in progress, kept for the upload stage.
+    @Published public private(set) var runDownloadMbps: Double?
+
+    /// Apple's tool ships with macOS 12 and later.
+    public nonisolated static let appleToolPath = "/usr/bin/networkQuality"
+
+    public var isAppleToolAvailable: Bool {
+        FileManager.default.isExecutableFile(atPath: Self.appleToolPath)
+    }
 
     private var currentProcess: Process?
-    private var simulationTask: Task<Void, Never>?
+    private var readTask: Task<Void, Never>?
+    private var demoTask: Task<Void, Never>?
+    /// Bumped on every start and cancel, so output from a run the user
+    /// stopped can never overwrite the state of the next one.
+    private var runID = 0
 
-    public init() {
-        refreshCLIStatus()
+    public init() {}
+
+    // MARK: - Finding the CLI
+
+    /// Looks for Ookla's `speedtest` binary off the main actor, because the
+    /// login-shell fallback can take a while and this runs inside Droppy.
+    public func refreshCLIStatus() {
+        guard !isCheckingCLI else { return }
+        isCheckingCLI = true
+        Task.detached(priority: .utility) { [weak self] in
+            let path = Self.locateBinary()
+            await MainActor.run {
+                guard let self else { return }
+                self.cliPath = path
+                self.isCLIAvailable = path != nil
+                self.isCheckingCLI = false
+                if path != nil, self.state == .cliMissing {
+                    self.state = .idle
+                }
+            }
+        }
     }
 
-    /// Checks if Ookla's speedtest CLI binary is available on the Mac.
-    @discardableResult
-    public func refreshCLIStatus() -> Bool {
-        let path = Self.locateBinary()
-        self.cliPath = path
-        let available = path != nil
-        self.isCLIAvailable = available
-        return available
-    }
-
-    /// Locates the speedtest binary across standard macOS locations.
-    public nonisolated static func locateBinary() -> String? {
+    /// Blocking; call it off the main actor.
+    nonisolated static func locateBinary() -> String? {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let candidates = [
             "/opt/homebrew/bin/speedtest",
             "/usr/local/bin/speedtest",
             "\(home)/.local/bin/speedtest",
             "\(home)/bin/speedtest",
-            "/usr/bin/speedtest",
-            "/bin/speedtest"
         ]
-
-        for path in candidates {
-            if FileManager.default.isExecutableFile(atPath: path) {
-                return path
-            }
+        if let path = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
+            return path
         }
 
-        // Fallback: login shell 'which'
+        // Fallback: whatever the user's login shell finds on its PATH.
         let pipe = Pipe()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-l", "-c", "which speedtest"]
+        process.arguments = ["-l", "-c", "command -v speedtest"]
         process.standardOutput = pipe
-        process.standardError = Pipe()
+        process.standardError = FileHandle.nullDevice
         do {
             try process.run()
-            process.waitUntilExit()
-            if process.terminationStatus == 0 {
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !output.isEmpty, FileManager.default.isExecutableFile(atPath: output) {
-                    return output
-                }
-            }
         } catch {
             return nil
         }
-
-        return nil
-    }
-
-    /// Stops any active running process or simulation without resetting state to idle.
-    private func stopCurrentWork() {
-        simulationTask?.cancel()
-        simulationTask = nil
-
-        if let proc = currentProcess, proc.isRunning {
-            proc.terminate()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0,
+              let output = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !output.isEmpty,
+              FileManager.default.isExecutableFile(atPath: output) else {
+            return nil
         }
-        currentProcess = nil
+        return output
     }
 
-    /// Explicit user-initiated cancellation.
+    // MARK: - Running
+
+    /// Stops the running test, if any, and returns to idle.
     public func cancel() {
         stopCurrentWork()
         if state.isRunning {
@@ -92,209 +102,250 @@ public final class SpeedtestRunner: ObservableObject {
         }
     }
 
-    /// Starts a real test using the official Ookla CLI.
-    public func startTest() {
+    /// Runs Ookla's CLI. Only call this once the user has accepted Ookla's
+    /// licence and privacy policy in the droplet: the flags pass that answer on.
+    func startOokla() {
+        guard !state.isRunning, let path = cliPath else { return }
+        launch(
+            path: path,
+            arguments: ["--format=jsonl", "--progress=yes", "--accept-license", "--accept-gdpr"],
+            initialState: .preparing,
+            onLine: { [weak self] line in self?.parseOoklaLine(line) },
+            onExit: { [weak self] status, _, stderr in
+                guard let self, self.state.isRunning else { return }
+                // A clean exit always ends in a "result" line; anything else failed.
+                self.state = .failed(Self.failureMessage(stderr: stderr, status: status))
+            }
+        )
+    }
+
+    /// Runs Apple's networkQuality, which prints one JSON object when it finishes.
+    func startApple() {
+        guard !state.isRunning, isAppleToolAvailable else { return }
+        launch(
+            path: Self.appleToolPath,
+            arguments: ["-c"],
+            initialState: .measuring,
+            onLine: nil,
+            onExit: { [weak self] status, stdout, stderr in
+                guard let self, self.state.isRunning else { return }
+                if let result = Self.parseAppleResult(stdout) {
+                    self.state = .completed(result)
+                } else {
+                    self.state = .failed(Self.failureMessage(stderr: stderr, status: status))
+                }
+            }
+        )
+    }
+
+    /// Plays a test with made-up numbers. Harness only: Droppy never shows it.
+    func startHarnessDemo() {
         guard !state.isRunning else { return }
         stopCurrentWork()
+        state = .preparing
+        let id = runID
 
-        guard let path = cliPath ?? Self.locateBinary() else {
-            self.cliPath = nil
-            self.isCLIAvailable = false
-            self.state = .cliMissing
-            return
+        var steps: [(SpeedtestState, UInt64)] = [(.ping(latency: 7.2, jitter: 0.9), 350_000_000)]
+        steps += [65.0, 185.0, 340.0, 460.0, 485.4].enumerated().map { index, speed in
+            (SpeedtestState.download(mbps: speed, progress: Double(index + 1) / 5), UInt64(300_000_000))
         }
+        steps += [45.0, 125.0, 210.0, 242.8].enumerated().map { index, speed in
+            (SpeedtestState.upload(mbps: speed, progress: Double(index + 1) / 4), UInt64(300_000_000))
+        }
+        steps.append((.completed(.harnessDemo), 300_000_000))
+        let demoSteps = steps
 
-        self.cliPath = path
-        self.isCLIAvailable = true
-        // Immediate visual feedback
-        self.state = .preparing
+        demoTask = Task { @MainActor [weak self] in
+            for (next, delay) in demoSteps {
+                try? await Task.sleep(nanoseconds: delay)
+                guard let self, !Task.isCancelled, self.runID == id else { return }
+                if case .download(let mbps, _) = next {
+                    self.runDownloadMbps = mbps
+                }
+                self.state = next
+            }
+        }
+    }
+
+    private func stopCurrentWork() {
+        runID += 1
+        runDownloadMbps = nil
+        demoTask?.cancel()
+        demoTask = nil
+        readTask?.cancel()
+        readTask = nil
+        if let process = currentProcess, process.isRunning {
+            process.terminate()
+        }
+        currentProcess = nil
+    }
+
+    /// Starts `path`, feeds each stdout line to `onLine` on the main actor
+    /// while it runs, and calls `onExit` with the whole output once it ends.
+    private func launch(
+        path: String,
+        arguments: [String],
+        initialState: SpeedtestState,
+        onLine: ((String) -> Void)?,
+        onExit: @escaping (_ status: Int32, _ stdout: String, _ stderr: String) -> Void
+    ) {
+        stopCurrentWork()
+        let id = runID
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
-        // Accepts Ookla license & GDPR non-interactively and streams JSON
-        process.arguments = [
-            "--format=json",
-            "--progress=yes",
-            "--accept-license",
-            "--accept-gdpr"
-        ]
-
+        process.arguments = arguments
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
-        self.currentProcess = process
-
-        let handle = stdoutPipe.fileHandleForReading
-        var buffer = Data()
-
-        handle.readabilityHandler = { [weak self] fileHandle in
-            let availableData = fileHandle.availableData
-            guard !availableData.isEmpty else { return }
-
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                buffer.append(availableData)
-                self.processBuffer(&buffer)
-            }
-        }
-
-        process.terminationHandler = { [weak self] proc in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                handle.readabilityHandler = nil
-                self.currentProcess = nil
-
-                if proc.terminationStatus != 0 {
-                    if case .completed = self.state {
-                        // Already completed cleanly
-                    } else if self.state.isRunning {
-                        let errData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                        let errMsg = String(data: errData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-                        self.state = .failed(errMsg?.isEmpty == false ? errMsg! : "Processen avbröts (kod \(proc.terminationStatus))")
-                    }
-                }
-            }
-        }
 
         do {
             try process.run()
         } catch {
-            self.state = .failed("Kunde inte starta speedtest: \(error.localizedDescription)")
+            state = .failed("Couldn't start the test: \(error.localizedDescription)")
+            return
         }
-    }
+        currentProcess = process
+        state = initialState
 
-    /// Starts an instant, realistic simulated test (for testing animations/UI).
-    public func startSimulatedTest() {
-        guard !state.isRunning else { return }
-        stopCurrentWork()
+        let stdout = stdoutPipe.fileHandleForReading
+        let stderr = stderrPipe.fileHandleForReading
+        readTask = Task.detached(priority: .userInitiated) { [weak self] in
+            // Drain stderr alongside stdout so a chatty tool can't fill the pipe and stall.
+            async let errorText: String = {
+                String(data: stderr.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            }()
 
-        // Step 0: Immediate visual feedback: Preparing
-        state = .preparing
-
-        simulationTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            guard !Task.isCancelled else { return }
-
-            // Step 1: Ping & Jitter stage
-            state = .ping(latency: 7.2, jitter: 0.9)
-            try? await Task.sleep(nanoseconds: 700_000_000)
-            guard !Task.isCancelled else { return }
-
-            // Step 2: Download ramp up
-            let downloadSteps: [(Double, Double)] = [
-                (65.0, 0.15), (185.0, 0.35), (340.0, 0.60), (460.0, 0.85), (485.4, 1.0)
-            ]
-            for (speed, progress) in downloadSteps {
-                state = .download(mbps: speed, progress: progress)
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                guard !Task.isCancelled else { return }
+            var lines: [String] = []
+            do {
+                for try await line in stdout.bytes.lines {
+                    lines.append(line)
+                    if let onLine {
+                        await MainActor.run {
+                            guard let self, self.runID == id else { return }
+                            onLine(line)
+                        }
+                    }
+                }
+            } catch {
+                // The pipe closed early; whatever arrived is handled below.
             }
 
-            // Step 3: Upload ramp up
-            let uploadSteps: [(Double, Double)] = [
-                (45.0, 0.20), (125.0, 0.50), (210.0, 0.80), (242.8, 1.0)
-            ]
-            for (speed, progress) in uploadSteps {
-                state = .upload(mbps: speed, progress: progress)
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                guard !Task.isCancelled else { return }
-            }
-
-            // Step 4: Completed result
-            let result = SpeedtestResult(
-                downloadMbps: 485.4,
-                uploadMbps: 242.8,
-                pingLatency: 7.2,
-                pingJitter: 0.9,
-                packetLoss: 0.0,
-                isp: "Bredband2",
-                serverName: "Stockholm Server",
-                serverLocation: "Stockholm",
-                resultURL: "https://www.speedtest.net",
-                isSimulated: true
-            )
-            state = .completed(result)
-        }
-    }
-
-    // MARK: - JSON Stream Processing
-
-    private func processBuffer(_ buffer: inout Data) {
-        let newline = UInt8(ascii: "\n")
-        while let index = buffer.firstIndex(of: newline) {
-            let lineData = buffer.subdata(in: 0..<index)
-            buffer.removeSubrange(0...index)
-
-            if !lineData.isEmpty {
-                parseJSONLine(lineData)
+            let errorOutput = await errorText
+            process.waitUntilExit()
+            let status = process.terminationStatus
+            let output = lines.joined(separator: "\n")
+            await MainActor.run {
+                guard let self, self.runID == id else { return }
+                self.currentProcess = nil
+                self.readTask = nil
+                onExit(status, output, errorOutput)
             }
         }
     }
 
-    private func parseJSONLine(_ data: Data) {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+    private nonisolated static func failureMessage(stderr: String, status: Int32) -> String {
+        let firstLine = stderr
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty }
+        if let firstLine {
+            // Ookla's CLI writes its own errors as JSON on stderr.
+            if let data = firstLine.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let message = (json["message"] ?? json["error"]) as? String {
+                return message
+            }
+            return firstLine
+        }
+        return "The test stopped (exit code \(status))"
+    }
+
+    // MARK: - Ookla output
+
+    private func parseOoklaLine(_ line: String) {
+        guard let data = line.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let type = json["type"] as? String else {
             return
         }
 
         switch type {
         case "testStart":
-            self.state = .preparing
+            state = .preparing
 
         case "ping":
-            if let pingDict = json["ping"] as? [String: Any] {
-                let latency = pingDict["latency"] as? Double ?? 0
-                let jitter = pingDict["jitter"] as? Double ?? 0
-                self.state = .ping(latency: latency, jitter: jitter)
+            if let ping = json["ping"] as? [String: Any] {
+                state = .ping(
+                    latency: ping["latency"] as? Double ?? 0,
+                    jitter: ping["jitter"] as? Double ?? 0
+                )
             }
 
         case "download":
-            if let dlDict = json["download"] as? [String: Any] {
-                let bandwidth = dlDict["bandwidth"] as? Double ?? 0
-                let progress = dlDict["progress"] as? Double ?? 0
-                let mbps = (bandwidth * 8.0) / 1_000_000.0
-                self.state = .download(mbps: mbps, progress: progress)
+            if let section = json["download"] as? [String: Any] {
+                let mbps = Self.mbps(fromBytesPerSecond: section["bandwidth"] as? Double ?? 0)
+                runDownloadMbps = mbps
+                state = .download(mbps: mbps, progress: section["progress"] as? Double ?? 0)
             }
 
         case "upload":
-            if let ulDict = json["upload"] as? [String: Any] {
-                let bandwidth = ulDict["bandwidth"] as? Double ?? 0
-                let progress = ulDict["progress"] as? Double ?? 0
-                let mbps = (bandwidth * 8.0) / 1_000_000.0
-                self.state = .upload(mbps: mbps, progress: progress)
+            if let section = json["upload"] as? [String: Any] {
+                state = .upload(
+                    mbps: Self.mbps(fromBytesPerSecond: section["bandwidth"] as? Double ?? 0),
+                    progress: section["progress"] as? Double ?? 0
+                )
             }
 
         case "result":
-            if let finalResult = try? JSONDecoder().decode(OoklaFinalResult.self, from: data) {
-                let dlBandwidth = Double(finalResult.download?.bandwidth ?? 0)
-                let ulBandwidth = Double(finalResult.upload?.bandwidth ?? 0)
-                let dlMbps = (dlBandwidth * 8.0) / 1_000_000.0
-                let ulMbps = (ulBandwidth * 8.0) / 1_000_000.0
-
-                let result = SpeedtestResult(
-                    downloadMbps: dlMbps,
-                    uploadMbps: ulMbps,
-                    pingLatency: finalResult.ping?.latency ?? 0,
-                    pingJitter: finalResult.ping?.jitter ?? 0,
-                    packetLoss: finalResult.packetLoss,
-                    isp: finalResult.isp,
-                    serverName: finalResult.server?.name,
-                    serverLocation: finalResult.server?.location,
-                    resultURL: finalResult.result?.url,
-                    isSimulated: false
-                )
-                self.state = .completed(result)
+            if let final = try? JSONDecoder().decode(OoklaFinalResult.self, from: data) {
+                state = .completed(SpeedtestResult(
+                    provider: .ookla,
+                    downloadMbps: Self.mbps(fromBytesPerSecond: Double(final.download?.bandwidth ?? 0)),
+                    uploadMbps: Self.mbps(fromBytesPerSecond: Double(final.upload?.bandwidth ?? 0)),
+                    pingLatency: final.ping?.latency ?? 0,
+                    pingJitter: final.ping?.jitter,
+                    packetLoss: final.packetLoss,
+                    isp: final.isp,
+                    serverName: final.server?.name,
+                    serverLocation: final.server?.location,
+                    resultURL: final.result?.url
+                ))
             }
 
         case "log":
-            if let level = json["level"] as? String, level == "error",
-               let message = json["message"] as? String {
-                self.state = .failed(message)
+            if json["level"] as? String == "error", let message = json["message"] as? String {
+                state = .failed(message)
             }
 
         default:
             break
         }
+    }
+
+    private nonisolated static func mbps(fromBytesPerSecond bandwidth: Double) -> Double {
+        bandwidth * 8 / 1_000_000
+    }
+
+    // MARK: - Apple output
+
+    nonisolated static func parseAppleResult(_ output: String) -> SpeedtestResult? {
+        // The JSON object is the whole output; skip anything printed before it.
+        guard let start = output.firstIndex(of: "{"),
+              let data = String(output[start...]).data(using: .utf8),
+              let parsed = try? JSONDecoder().decode(NetworkQualityResult.self, from: data),
+              parsed.error_code == nil,
+              let download = parsed.dl_throughput,
+              let upload = parsed.ul_throughput else {
+            return nil
+        }
+        return SpeedtestResult(
+            provider: .apple,
+            downloadMbps: download / 1_000_000,
+            uploadMbps: upload / 1_000_000,
+            pingLatency: parsed.base_rtt ?? 0,
+            responsivenessRPM: parsed.responsiveness ?? parsed.dl_responsiveness
+        )
     }
 }
