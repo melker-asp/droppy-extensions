@@ -22,6 +22,10 @@ Droppy-specific differences listed in the folder's `CLAUDE.md`.
   a settings page): a **droplet**.
 - Something that **acts on the text the user has selected** (transform, look
   up, send somewhere): a **clip**. Smallest of the two: often one JSON file.
+- Something that should **also be reachable from Thunderstorm**: still a droplet.
+  Its shelf widgets and settings show up in the launcher on their own (see
+  `droplets/CLAUDE.md`, Thunderstorm). Build a `thunderstorm/` extension only for
+  a launcher command with its own lists, forms or arguments.
 
 ## Layout
 

@@ -3,7 +3,7 @@
   "name": "Speedtest",
   "version": "1.0.0",
   "summary": "Test your internet speed with Speedtest by Ookla",
-  "description": "Run a Speedtest by Ookla from the shelf and watch download and upload speed live beside the notch. When it finishes you see download, upload, ping, jitter, packet loss, your provider and a link to the result on speedtest.net.\n\nSpeedtest runs Ookla's official CLI, which you install with Homebrew; the settings have the command to copy. Ookla asks you to accept its license and privacy policy once before the first test.\n\nWithout the CLI, Speedtest can measure with Apple's network test built into macOS instead, and says so on every result.",
+  "description": "Run a Speedtest by Ookla from the shelf or Thunderstorm and watch download and upload speed live beside the notch. When it finishes you see download, upload, ping, jitter, packet loss, your provider and a link to the result on speedtest.net.\n\nSpeedtest runs Ookla's official CLI, which you install with Homebrew; the settings have the command to copy. Ookla asks you to accept its license and privacy policy once before the first test.\n\nWithout the CLI, Speedtest can measure with Apple's network test built into macOS instead, and says so on every result.",
   "category": "system",
   "kit": {
     "abi": 1,

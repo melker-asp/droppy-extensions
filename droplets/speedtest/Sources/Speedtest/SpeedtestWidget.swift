@@ -2,8 +2,10 @@
 //  SpeedtestWidget.swift
 //  Speedtest
 //
-//  The shelf widget, also drawn wide when Thunderstorm shows it,
-//  following Apple Human Interface Guidelines and DroppyKit design rules.
+//  The shelf widget. Thunderstorm lists this same widget and mounts it in
+//  the launcher when it is picked, at the launcher's width, so the widget is
+//  also the droplet's launcher surface (see droplets/CLAUDE.md, Thunderstorm).
+//  Following Apple Human Interface Guidelines and DroppyKit design rules.
 //
 
 import AppKit
@@ -24,7 +26,9 @@ extension SpeedtestDroplet: ShelfWidgetProviding {
                     preferredPairedWidth: 220,
                     contentHeight: .fixed(175)
                 ),
-                focusPolicy: .keyboardFocusable,
+                // No text field, so it never asks for the keyboard.
+                focusPolicy: .none,
+                // Thunderstorm finds the widget by its title and these.
                 searchKeywords: [
                     "speedtest", "ookla", "speed", "internet", "wifi",
                     "broadband", "ping", "download", "upload", "mbps", "network",
@@ -34,7 +38,8 @@ extension SpeedtestDroplet: ShelfWidgetProviding {
     }
 
     public func makeWidgetView(_ id: ShelfWidgetID, context: ShelfWidgetContext) -> AnyView {
-        AnyView(SpeedtestWidget(droplet: self, context: context))
+        host?.log.debug("Widget mounted at \(Int(context.availableSize.width))×\(Int(context.availableSize.height)), compact: \(context.isCompact)")
+        return AnyView(SpeedtestWidget(droplet: self, context: context))
     }
 
     public func makeWidgetSettingsPopover(_ id: ShelfWidgetID) -> AnyView? { nil }
@@ -48,13 +53,17 @@ struct SpeedtestWidget: View {
 
     private var state: SpeedtestState { droplet.runner.state }
 
+    /// A solo shelf card is at most about 440pt wide; Thunderstorm mounts the
+    /// widget wider than that, which is how the widget tells the two apart.
+    static let launcherWidth: CGFloat = 500
+
     var body: some View {
         VStack(alignment: .leading, spacing: DroppySpacing.sm) {
             header
             if context.isCompact {
                 pairedBody
             } else {
-                wideOrSoloBody(isWide: context.availableSize.width >= 500)
+                wideOrSoloBody(isWide: context.availableSize.width >= Self.launcherWidth)
             }
             Spacer(minLength: 0)
         }
@@ -329,7 +338,7 @@ struct SpeedtestWidget: View {
         }
     }
 
-    // MARK: - Solo (shelf) and wide (Thunderstorm)
+    // MARK: - Solo (shelf) and wide (Thunderstorm launcher)
 
     private func wideOrSoloBody(isWide: Bool) -> some View {
         VStack(alignment: .leading, spacing: isWide ? DroppySpacing.md : DroppySpacing.sm) {

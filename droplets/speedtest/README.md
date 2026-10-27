@@ -14,8 +14,11 @@ A Droplet for [Droppy](https://getdroppy.app), built with
   while the test runs; the widget keeps the full result.
 - Without the CLI, Speedtest measures with Apple's network test (`networkQuality`,
   built into macOS) and labels the result as Apple's. You can turn that off in its settings.
-- To start a test from Thunderstorm, add a quicklink to `droppy://droplet/speedtest/run`.
-  `droppy://droplet/speedtest/stop` stops it.
+- In Thunderstorm, type "speedtest" (or "ookla", "ping", "wifi") and open the Speedtest
+  widget: it shows inside the launcher, with the full result and buttons to open it on
+  speedtest.net or copy it.
+- `droppy://droplet/speedtest/run` starts a test and `droppy://droplet/speedtest/stop`
+  stops it, for a hotkey or a script.
 
 ## Developing
 
