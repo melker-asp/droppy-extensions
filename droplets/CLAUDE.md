@@ -9,7 +9,7 @@ clips.
 - `droppykit/`: the SDK checkout (git, gitlab.com/droppyformac1/droppykit).
   Its `AGENTS.md` explains what is where in the SDK. **Do not edit it**; fixes
   go upstream.
-- `pong/`, `sums/`, `desk-dj/`: droplets, one SwiftPM package each. Every
+- `pong/`, `sums/`, `desk-dj/`, `todoist/`, `speedtest/`: droplets, one SwiftPM package each. Every
   package has its own `AGENTS.md` (the brief: the loop, the rules, the surfaces
   table, "done means") and a `CLAUDE.md` that imports it. Work inside the
   package you are changing, and follow its `AGENTS.md`.
@@ -60,6 +60,55 @@ cd <id> && droppykit agent             # writes AGENTS.md, CLAUDE.md, .mcp.json 
 
 With the DroppyKit MCP server from the package's `.mcp.json` these are
 `droppykit_build`, `droppykit_validate`, `droppykit_shots`, `droppykit_install`.
+
+## Thunderstorm (Droppy's launcher)
+
+A droplet shows up in Thunderstorm without any code of its own. This is how Todoist,
+Calendar and Speedtest get there. There is no Thunderstorm API or surface to declare.
+Droppy turns what the droplet already provides into launcher rows (the item kinds are in
+`droppykit/Sources/DroppyKit/Services/DropletLauncherService.swift`):
+
+- **The droplet itself** (`kind: .droplet`): its Store page.
+- **Every shelf widget** (`kind: .surface`): one row per `ShelfWidgetDescriptor`,
+  titled `title` with `systemImage` as its icon. It is found by the title and
+  `searchKeywords`, so fill those with the words a user would type, in English.
+  Picking the row mounts the same `makeWidgetView` inside the launcher's window, at
+  the launcher's width. The launcher presents it as a detail view with a way back,
+  and the view takes the keyboard there.
+- **The settings pane** (`kind: .setting`): it opens right in the launcher panel,
+  and `settingsSearchEntries` make it findable.
+
+So build for the launcher by building a good widget:
+
+- The launcher mounts the widget wider than any solo shelf card (440pt is the
+  widest here). Branch on `context.availableSize.width` and give the wide
+  composition room for what the shelf hides: the full result, actions with
+  labels. Speedtest switches at 500pt (`SpeedtestWidget.launcherWidth`).
+- `focusPolicy: .keyboardFocusable` only for a widget whose main control is a text
+  field, as on the shelf. A widget without one stays `.none`.
+- Mounting must have no side effects: no test starting, no permission prompt. The
+  user picks the row and then presses the widget's own button.
+- For a start-it-now action without opening the widget, adopt `DropletURLHandling`.
+  The user can then put `droppy://droplet/<id>/<path>` behind a Thunderstorm
+  quicklink or a hotkey.
+- The `launcher` capability and `host.launcher` are not how a droplet gets into
+  Thunderstorm. They are for a droplet that draws **its own** launcher and wants
+  Droppy's items in it (`Launchers.md`).
+- A Raycast-style extension in `../thunderstorm/` is only worth it for a launcher
+  command with lists, forms or arguments that a widget cannot be. It runs in
+  Thunderstorm's Node runtime and shares no code with the droplet.
+
+Measured on this Mac (Droppy 16.0.2-nightly, 2026-10-27, Speedtest opened from
+Thunderstorm): the launcher mounts the widget three times in a row, at 0×0, then
+710×209, then 710×217, with `isCompact` false. So the launcher gives about 710pt of
+width, well past Speedtest's 500pt switch, and a height of its own that ignores the
+descriptor's `contentHeight` (Speedtest declares `.fixed(175)`). Lay the wide
+composition out for that height, and ignore a 0×0 pass. With the widget open, the
+launcher's search field keeps the keyboard focus. Whether Return reaches the widget's
+buttons is still unverified. To read a droplet's `host.log.debug` lines, stream them
+while you mount it (`/usr/bin/log stream --level debug --predicate 'process == "Droppy"'`),
+because `log show` does not keep debug lines. In zsh, call `/usr/bin/log`: a bare
+`log` is a shell builtin and prints nothing.
 
 ## Keeping the wiring current
 

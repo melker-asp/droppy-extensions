@@ -2,8 +2,10 @@
 //  SpeedtestWidget.swift
 //  Speedtest
 //
-//  The shelf widget and Thunderstorm launcher presentation,
-//  crafted following Apple Human Interface Guidelines and DroppyKit design rules.
+//  The shelf widget. Thunderstorm lists this same widget and mounts it in
+//  the launcher when it is picked, at the launcher's width, so the widget is
+//  also the droplet's launcher surface (see droplets/CLAUDE.md, Thunderstorm).
+//  Following Apple Human Interface Guidelines and DroppyKit design rules.
 //
 
 import AppKit
@@ -24,17 +26,20 @@ extension SpeedtestDroplet: ShelfWidgetProviding {
                     preferredPairedWidth: 220,
                     contentHeight: .fixed(175)
                 ),
-                focusPolicy: .keyboardFocusable,
+                // No text field, so it never asks for the keyboard.
+                focusPolicy: .none,
+                // Thunderstorm finds the widget by its title and these.
                 searchKeywords: [
-                    "speedtest", "ookla", "hastighet", "internet", "wifi",
-                    "bredband", "ping", "download", "upload", "mbps", "nätverk"
+                    "speedtest", "ookla", "speed", "internet", "wifi",
+                    "broadband", "ping", "download", "upload", "mbps", "network",
                 ]
             )
         ]
     }
 
     public func makeWidgetView(_ id: ShelfWidgetID, context: ShelfWidgetContext) -> AnyView {
-        AnyView(SpeedtestWidget(droplet: self, context: context))
+        host?.log.debug("Widget mounted at \(Int(context.availableSize.width))×\(Int(context.availableSize.height)), compact: \(context.isCompact)")
+        return AnyView(SpeedtestWidget(droplet: self, context: context))
     }
 
     public func makeWidgetSettingsPopover(_ id: ShelfWidgetID) -> AnyView? { nil }
@@ -46,24 +51,24 @@ struct SpeedtestWidget: View {
     @ObservedObject var droplet: SpeedtestDroplet
     let context: ShelfWidgetContext
 
+    private var state: SpeedtestState { droplet.runner.state }
+
+    /// A solo shelf card is at most about 440pt wide; Thunderstorm mounts the
+    /// widget wider than that, which is how the widget tells the two apart.
+    static let launcherWidth: CGFloat = 500
+
     var body: some View {
         VStack(alignment: .leading, spacing: DroppySpacing.sm) {
             header
             if context.isCompact {
                 pairedBody
-            } else if isThunderstormWidth {
-                thunderstormBody
             } else {
-                soloBody
+                wideOrSoloBody(isWide: context.availableSize.width >= Self.launcherWidth)
             }
             Spacer(minLength: 0)
         }
         .padding(context.contentInsets)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var isThunderstormWidth: Bool {
-        context.availableSize.width >= 500
     }
 
     // MARK: - Header
@@ -78,11 +83,11 @@ struct SpeedtestWidget: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
 
-            if let isp = currentOrLastISP {
+            if let source = sourceLabel {
                 Text("•")
                     .font(.system(size: 10))
                     .foregroundStyle(AdaptiveColors.notchSurfaceTertiaryText)
-                Text(isp)
+                Text(source)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(AdaptiveColors.notchSurfaceTertiaryText)
                     .lineLimit(1)
@@ -90,7 +95,7 @@ struct SpeedtestWidget: View {
 
             Spacer(minLength: DroppySpacing.md)
 
-            if droplet.runner.state.isRunning {
+            if state.isRunning {
                 Button {
                     droplet.cancelTest()
                 } label: {
@@ -98,27 +103,117 @@ struct SpeedtestWidget: View {
                         .font(.system(size: 9, weight: .bold))
                 }
                 .buttonStyle(DroppyCircleButtonStyle(size: 20, destructive: true, solidFill: nil, foregroundColorOverride: nil))
-                .help("Avbryt mätning")
-                .accessibilityLabel("Avbryt mätning")
+                .help("Stop the test")
+                .accessibilityLabel("Stop the test")
             } else {
                 Button {
-                    if droplet.runner.isCLIAvailable {
-                        droplet.startTest()
-                    } else {
-                        droplet.startSimulatedTest()
-                    }
+                    droplet.startTest()
                 } label: {
                     Image(systemName: "play.fill")
                         .font(.system(size: 9, weight: .bold))
                 }
                 .buttonStyle(DroppyCircleButtonStyle(size: 20))
-                .help("Starta hastighetstest")
-                .accessibilityLabel("Starta hastighetstest")
+                .help("Start a speed test")
+                .accessibilityLabel("Start a speed test")
             }
         }
     }
 
-    // MARK: - Active Phase Status Capsule (Apple Native Feedback)
+    /// The ISP for an Ookla result, or which tool measured an Apple one.
+    private var sourceLabel: String? {
+        guard let result = droplet.lastResult else { return nil }
+        switch result.provider {
+        case .ookla: return result.isp
+        case .apple: return result.provider.displayName
+        }
+    }
+
+    // MARK: - Notices
+
+    /// What stands between the user and a test, if anything.
+    @ViewBuilder
+    private func notice(compact: Bool) -> some View {
+        switch state {
+        case .needsTerms:
+            noticeBlock(
+                symbol: "doc.text",
+                tint: .teal,
+                title: "Accept Ookla's terms first",
+                detail: compact ? nil : "Ookla's CLI runs only once you accept its license and privacy policy."
+            ) {
+                Button("Accept and run") { droplet.acceptTermsAndStart() }
+                    .buttonStyle(DroppyAccentButtonStyle(size: .small))
+                Button("Review") { droplet.openSettings() }
+                    .buttonStyle(DroppyQuietButtonStyle(size: .small))
+            }
+
+        case .cliMissing:
+            noticeBlock(
+                symbol: "exclamationmark.triangle.fill",
+                tint: .orange,
+                title: "Install Ookla's Speedtest CLI",
+                detail: compact ? nil : "Copy the Homebrew command and paste it in Terminal."
+            ) {
+                Button("Copy command") { droplet.copyInstallCommand() }
+                    .buttonStyle(DroppyAccentButtonStyle(size: .small))
+                Button("Settings") { droplet.openSettings() }
+                    .buttonStyle(DroppyQuietButtonStyle(size: .small))
+            }
+
+        default:
+            if !compact, droplet.lastResult == nil, !droplet.runner.isCLIAvailable,
+               !droplet.runner.isCheckingCLI, !droplet.isHarness {
+                noticeBlock(
+                    symbol: "info.circle",
+                    tint: AdaptiveColors.notchSurfaceSecondaryText,
+                    title: "Tests use Apple's network test",
+                    detail: "Install Ookla's CLI for Speedtest results."
+                ) {
+                    Button("Set up") { droplet.openSettings() }
+                        .buttonStyle(DroppyQuietButtonStyle(size: .small))
+                }
+            }
+        }
+    }
+
+    private func noticeBlock<Buttons: View>(
+        symbol: String,
+        tint: Color,
+        title: String,
+        detail: String?,
+        @ViewBuilder buttons: () -> Buttons
+    ) -> some View {
+        VStack(alignment: .leading, spacing: DroppySpacing.xs) {
+            HStack(spacing: DroppySpacing.xsm) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12))
+                    .foregroundStyle(tint)
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
+                    .lineLimit(1)
+            }
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
+                    .lineLimit(2)
+            }
+            HStack(spacing: DroppySpacing.sm) {
+                buttons()
+            }
+        }
+        .transition(DroppyTransition.element)
+    }
+
+    private var hasNotice: Bool {
+        switch state {
+        case .needsTerms, .cliMissing: return true
+        default: return false
+        }
+    }
+
+    // MARK: - Active stage
 
     private var activeStatusCapsule: some View {
         HStack(spacing: DroppySpacing.xs) {
@@ -127,38 +222,43 @@ struct SpeedtestWidget: View {
                 .scaleEffect(0.7)
                 .frame(width: 14, height: 14)
 
-            Text(droplet.runner.state.stageTitle)
+            Text(state.stageTitle)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
                 .lineLimit(1)
 
             Spacer(minLength: 0)
 
-            if case .download(_, let progress) = droplet.runner.state {
-                Text("\(Int(progress * 100))%")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.teal)
-            } else if case .upload(_, let progress) = droplet.runner.state {
-                Text("\(Int(progress * 100))%")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.blue)
+            if case .download(_, let progress) = state {
+                progressText(progress, tint: .teal)
+            } else if case .upload(_, let progress) = state {
+                progressText(progress, tint: .blue)
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .background(AdaptiveColors.notchSurfaceCardFill)
         .clipShape(Capsule(style: .continuous))
+        .transition(DroppyTransition.element)
     }
 
-    // MARK: - Paired Mode (Compact 220pt)
+    private func progressText(_ progress: Double, tint: Color) -> some View {
+        Text("\(Int(progress * 100))%")
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(tint)
+    }
 
+    // MARK: - Paired (220pt)
+
+    @ViewBuilder
     private var pairedBody: some View {
-        VStack(alignment: .leading, spacing: DroppySpacing.xs) {
-            if droplet.runner.state.isRunning {
-                liveRunningCompact
-            } else if let result = droplet.lastResult {
+        if hasNotice {
+            notice(compact: true)
+        } else if state.isRunning {
+            liveRunningCompact
+        } else if let result = droplet.lastResult {
+            VStack(alignment: .leading, spacing: DroppySpacing.xs) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(SpeedtestResult.formattedSpeed(result.downloadMbps))
                         .font(.system(size: 22, weight: .bold, design: .rounded))
@@ -171,26 +271,26 @@ struct SpeedtestWidget: View {
                     Spacer(minLength: 0)
 
                     Text("\(String(format: "%.0f", result.pingLatency)) ms")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .font(.system(size: 11, weight: .medium))
+                        .monospacedDigit()
                         .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
                 }
 
-                HStack(spacing: DroppySpacing.md) {
-                    Text("↑ \(SpeedtestResult.formattedSpeed(result.uploadMbps)) Mbps")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Redo att mäta")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
-                    Text("Klicka på Play för att starta")
-                        .font(.system(size: 11))
-                        .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                }
-                .padding(.top, 2)
+                Text("↑ \(SpeedtestResult.formattedSpeed(result.uploadMbps)) Mbps")
+                    .font(.system(size: 11, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
             }
+        } else {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Ready to test")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
+                Text("Press play to start")
+                    .font(.system(size: 11))
+                    .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
+            }
+            .padding(.top, 2)
         }
     }
 
@@ -201,93 +301,107 @@ struct SpeedtestWidget: View {
                     .controlSize(.small)
                     .scaleEffect(0.7)
                     .frame(width: 12, height: 12)
-                Text(droplet.runner.state.stageTitle)
+                Text(state.stageTitle)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Color.teal)
                     .lineLimit(1)
             }
 
-            switch droplet.runner.state {
+            switch state {
             case .download(let mbps, _):
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("↓")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color.teal)
-                    Text(SpeedtestResult.formattedSpeed(mbps))
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
-                    Text("Mbps")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                }
+                liveSpeed(arrow: "↓", mbps: mbps, tint: .teal)
             case .upload(let mbps, _):
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("↑")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color.blue)
-                    Text(SpeedtestResult.formattedSpeed(mbps))
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
-                    Text("Mbps")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                }
+                liveSpeed(arrow: "↑", mbps: mbps, tint: .blue)
             case .ping(let latency, _):
                 Text("\(String(format: "%.0f", latency)) ms ping")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
             default:
-                HStack(spacing: 4) {
-                    Text("Ansluter…")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                }
+                EmptyView()
             }
         }
     }
 
-    // MARK: - Solo Mode (Standard Shelf)
-
-    private var soloBody: some View {
-        VStack(alignment: .leading, spacing: DroppySpacing.sm) {
-            // Live status feedback row when running
-            if droplet.runner.state.isRunning {
-                activeStatusCapsule
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            } else if !droplet.runner.isCLIAvailable && droplet.lastResult == nil {
-                cliMissingNotice(compact: true)
-            }
-
-            // Hero Metric Columns (Download & Upload)
-            HStack(alignment: .top, spacing: DroppySpacing.lg) {
-                // Download Column
-                metricColumn(
-                    title: "NEDLADDNING",
-                    symbol: "arrow.down",
-                    value: currentDownloadDisplay,
-                    tint: Color.teal,
-                    isActivePhase: isDownloadActive,
-                    progress: currentDownloadProgress
-                )
-
-                // Upload Column
-                metricColumn(
-                    title: "UPPLADDNING",
-                    symbol: "arrow.up",
-                    value: currentUploadDisplay,
-                    tint: Color.blue,
-                    isActivePhase: isUploadActive,
-                    progress: currentUploadProgress
-                )
-            }
-
-            // Diagnostics Strip
-            diagnosticsStrip
+    private func liveSpeed(arrow: String, mbps: Double, tint: Color) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(arrow)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(tint)
+            Text(SpeedtestResult.formattedSpeed(mbps))
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
+            Text("Mbps")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
         }
-        .animation(.easeInOut(duration: 0.25), value: droplet.runner.state.isRunning)
+    }
+
+    // MARK: - Solo (shelf) and wide (Thunderstorm launcher)
+
+    private func wideOrSoloBody(isWide: Bool) -> some View {
+        VStack(alignment: .leading, spacing: isWide ? DroppySpacing.md : DroppySpacing.sm) {
+            if state.isRunning {
+                activeStatusCapsule
+            } else {
+                notice(compact: false)
+            }
+
+            if !hasNotice {
+                HStack(alignment: isWide ? .center : .top, spacing: isWide ? DroppySpacing.xl : DroppySpacing.lg) {
+                    metricColumn(
+                        title: "Download",
+                        symbol: "arrow.down",
+                        value: currentDownloadDisplay,
+                        tint: .teal,
+                        isActivePhase: isDownloadActive,
+                        progress: currentDownloadProgress
+                    )
+                    .frame(minWidth: isWide ? 150 : nil)
+
+                    metricColumn(
+                        title: "Upload",
+                        symbol: "arrow.up",
+                        value: currentUploadDisplay,
+                        tint: .blue,
+                        isActivePhase: isUploadActive,
+                        progress: currentUploadProgress
+                    )
+                    .frame(minWidth: isWide ? 150 : nil)
+
+                    if isWide {
+                        Spacer(minLength: DroppySpacing.md)
+                        resultActions
+                    }
+                }
+
+                diagnosticsStrip
+            }
+        }
+        .animation(DroppyAnimation.state, value: state.isRunning)
+        .animation(DroppyAnimation.state, value: hasNotice)
+    }
+
+    private var resultActions: some View {
+        VStack(alignment: .trailing, spacing: DroppySpacing.xs) {
+            if droplet.lastResult?.resultURL != nil {
+                Button {
+                    droplet.openResultInBrowser()
+                } label: {
+                    Label("Open on speedtest.net", systemImage: "arrow.up.right")
+                }
+                .buttonStyle(DroppyQuietButtonStyle(size: .small))
+            }
+
+            Button {
+                droplet.copyLastResult()
+            } label: {
+                Label("Copy result", systemImage: "doc.on.doc")
+            }
+            .buttonStyle(DroppyQuietButtonStyle(size: .small))
+            .disabled(droplet.lastResult == nil)
+        }
     }
 
     private func metricColumn(
@@ -304,8 +418,7 @@ struct SpeedtestWidget: View {
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(isActivePhase ? tint : AdaptiveColors.notchSurfaceSecondaryText)
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(0.5)
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
             }
 
@@ -319,18 +432,17 @@ struct SpeedtestWidget: View {
                     .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
             }
 
-            // Smooth Apple progress track
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule(style: .continuous)
-                        .fill(Color.white.opacity(0.08))
+                        .fill(AdaptiveColors.notchSurfaceCardFill)
                         .frame(height: 3)
 
-                    if let prog = progress, prog > 0 {
+                    if let progress, progress > 0 {
                         Capsule(style: .continuous)
                             .fill(tint)
-                            .frame(width: max(geo.size.width * CGFloat(prog), 4), height: 3)
-                            .animation(.easeOut(duration: 0.2), value: prog)
+                            .frame(width: max(geo.size.width * CGFloat(progress), 4), height: 3)
+                            .animation(.easeOut(duration: 0.2), value: progress)
                     }
                 }
             }
@@ -338,171 +450,84 @@ struct SpeedtestWidget: View {
             .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title): \(value) megabits per second")
     }
 
-    // MARK: - Thunderstorm Mode (Wide Launcher Canvas)
-
-    private var thunderstormBody: some View {
-        VStack(alignment: .leading, spacing: DroppySpacing.md) {
-            if droplet.runner.state.isRunning {
-                activeStatusCapsule
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            } else if !droplet.runner.isCLIAvailable && droplet.lastResult == nil {
-                cliMissingNotice(compact: false)
-            }
-
-            HStack(alignment: .center, spacing: DroppySpacing.xl) {
-                // Left: Speeds
-                HStack(spacing: DroppySpacing.xl) {
-                    metricColumn(
-                        title: "NEDLADDNING",
-                        symbol: "arrow.down",
-                        value: currentDownloadDisplay,
-                        tint: Color.teal,
-                        isActivePhase: isDownloadActive,
-                        progress: currentDownloadProgress
-                    )
-                    .frame(minWidth: 150)
-
-                    metricColumn(
-                        title: "UPPLADDNING",
-                        symbol: "arrow.up",
-                        value: currentUploadDisplay,
-                        tint: Color.blue,
-                        isActivePhase: isUploadActive,
-                        progress: currentUploadProgress
-                    )
-                    .frame(minWidth: 150)
-                }
-
-                Spacer(minLength: DroppySpacing.md)
-
-                // Right: Action Buttons
-                VStack(alignment: .trailing, spacing: DroppySpacing.xs) {
-                    if let res = droplet.lastResult, res.resultURL != nil {
-                        Button {
-                            droplet.openResultInBrowser()
-                        } label: {
-                            Label("Öppna på speedtest.net", systemImage: "arrow.up.right")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-
-                    Button {
-                        droplet.copyLastResult()
-                    } label: {
-                        Label("Kopiera resultat", systemImage: "doc.on.doc")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(droplet.lastResult == nil)
-                }
-            }
-
-            diagnosticsStrip
-        }
-        .animation(.easeInOut(duration: 0.25), value: droplet.runner.state.isRunning)
-    }
-
-    // MARK: - Diagnostics Strip
+    // MARK: - Diagnostics
 
     private var diagnosticsStrip: some View {
         HStack(spacing: DroppySpacing.md) {
             statItem(label: "Ping", value: pingDisplay)
-            divider
-            statItem(label: "Jitter", value: jitterDisplay)
-            divider
-            statItem(label: "Förlust", value: packetLossDisplay)
 
-            if let server = currentOrLastServer {
+            if let rpm = shownResult?.responsivenessRPM {
+                divider
+                statItem(label: "Responsiveness", value: String(format: "%.0f RPM", rpm))
+            } else {
+                divider
+                statItem(label: "Jitter", value: jitterDisplay)
+            }
+
+            if let loss = shownResult?.packetLoss {
+                divider
+                statItem(label: "Loss", value: String(format: "%.1f%%", loss))
+            }
+
+            if let server = shownResult?.serverName {
                 divider
                 statItem(label: "Server", value: server)
             }
 
             Spacer(minLength: 0)
 
-            if let result = droplet.lastResult, !droplet.runner.state.isRunning {
+            if let result = droplet.lastResult, !state.isRunning {
                 Text(result.timestamp, style: .time)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 10))
+                    .monospacedDigit()
                     .foregroundStyle(AdaptiveColors.notchSurfaceTertiaryText)
             }
         }
+        .lineLimit(1)
         .padding(.top, DroppySpacing.xs)
     }
 
     private var divider: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.1))
+        Capsule(style: .continuous)
+            .fill(AdaptiveColors.notchSurfaceCardFill)
             .frame(width: 1, height: 10)
     }
 
     private func statItem(label: String, value: String) -> some View {
         HStack(spacing: 4) {
-            Text(label + ":")
+            Text(label)
                 .font(.system(size: 11, weight: .regular))
                 .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
             Text(value)
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .font(.system(size: 11, weight: .semibold))
+                .monospacedDigit()
                 .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
         }
     }
 
-    // MARK: - Missing CLI Notice
+    // MARK: - State helpers
 
-    private func cliMissingNotice(compact: Bool) -> some View {
-        VStack(alignment: .leading, spacing: DroppySpacing.xs) {
-            HStack(spacing: DroppySpacing.xsm) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.orange)
-                Text("Ookla CLI krävs för skarpa mätningar")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
-            }
-
-            Text("Installera via Terminalen med Homebrew:")
-                .font(.system(size: 11))
-                .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-
-            HStack(spacing: DroppySpacing.sm) {
-                Text("brew install speedtest")
-                    .font(.system(size: 11, design: .monospaced))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(AdaptiveColors.notchSurfaceCardFill)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                Button("Kopiera") {
-                    droplet.copyBrewInstallCommand()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-
-                Button("Provkör simulering") {
-                    droplet.startSimulatedTest()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-        }
-        .padding(.vertical, 4)
+    /// The result the strip describes: none while a new test is running.
+    private var shownResult: SpeedtestResult? {
+        state.isRunning ? nil : droplet.lastResult
     }
 
-    // MARK: - State Helpers
-
     private var isDownloadActive: Bool {
-        if case .download = droplet.runner.state { return true }
+        if case .download = state { return true }
         return false
     }
 
     private var isUploadActive: Bool {
-        if case .upload = droplet.runner.state { return true }
+        if case .upload = state { return true }
         return false
     }
 
     private var currentDownloadProgress: Double? {
-        switch droplet.runner.state {
+        switch state {
         case .download(_, let progress): return progress
         case .upload, .completed: return 1.0
         default: return nil
@@ -510,7 +535,7 @@ struct SpeedtestWidget: View {
     }
 
     private var currentUploadProgress: Double? {
-        switch droplet.runner.state {
+        switch state {
         case .upload(_, let progress): return progress
         case .completed: return 1.0
         default: return nil
@@ -518,82 +543,40 @@ struct SpeedtestWidget: View {
     }
 
     private var currentDownloadDisplay: String {
-        switch droplet.runner.state {
-        case .preparing:
-            return "…"
-        case .ping:
+        switch state {
+        case .preparing, .ping, .measuring:
             return "…"
         case .download(let mbps, _):
             return SpeedtestResult.formattedSpeed(mbps)
-        case .upload, .completed:
-            if let last = droplet.lastResult {
-                return SpeedtestResult.formattedSpeed(last.downloadMbps)
-            }
-            return "—"
+        case .upload:
+            return droplet.runner.runDownloadMbps.map(SpeedtestResult.formattedSpeed) ?? "…"
         default:
-            if let last = droplet.lastResult {
-                return SpeedtestResult.formattedSpeed(last.downloadMbps)
-            }
-            return "—"
+            return droplet.lastResult.map { SpeedtestResult.formattedSpeed($0.downloadMbps) } ?? "—"
         }
     }
 
     private var currentUploadDisplay: String {
-        switch droplet.runner.state {
-        case .preparing, .ping, .download:
+        switch state {
+        case .preparing, .ping, .download, .measuring:
             return "…"
         case .upload(let mbps, _):
             return SpeedtestResult.formattedSpeed(mbps)
-        case .completed(let result):
-            return SpeedtestResult.formattedSpeed(result.uploadMbps)
         default:
-            if let last = droplet.lastResult {
-                return SpeedtestResult.formattedSpeed(last.uploadMbps)
-            }
-            return "—"
+            return droplet.lastResult.map { SpeedtestResult.formattedSpeed($0.uploadMbps) } ?? "—"
         }
     }
 
     private var pingDisplay: String {
-        switch droplet.runner.state {
-        case .ping(let latency, _):
+        if case .ping(let latency, _) = state {
             return String(format: "%.0f ms", latency)
-        case .completed(let res):
-            return String(format: "%.0f ms", res.pingLatency)
-        default:
-            if let last = droplet.lastResult {
-                return String(format: "%.0f ms", last.pingLatency)
-            }
-            return "—"
         }
+        return shownResult.map { String(format: "%.0f ms", $0.pingLatency) } ?? "—"
     }
 
     private var jitterDisplay: String {
-        switch droplet.runner.state {
-        case .ping(_, let jitter):
+        if case .ping(_, let jitter) = state {
             return String(format: "%.1f ms", jitter)
-        case .completed(let res):
-            return String(format: "%.1f ms", res.pingJitter)
-        default:
-            if let last = droplet.lastResult {
-                return String(format: "%.1f ms", last.pingJitter)
-            }
-            return "—"
         }
-    }
-
-    private var packetLossDisplay: String {
-        if let loss = droplet.lastResult?.packetLoss {
-            return String(format: "%.1f%%", loss)
-        }
-        return "0%"
-    }
-
-    private var currentOrLastISP: String? {
-        droplet.lastResult?.isp
-    }
-
-    private var currentOrLastServer: String? {
-        droplet.lastResult?.serverName
+        return shownResult?.pingJitter.map { String(format: "%.1f ms", $0) } ?? "—"
     }
 }

@@ -4,7 +4,24 @@
     "error" : null
   },
   "activity" : [
-
+    {
+      "at" : "2026-10-27T21:20:49Z",
+      "detail" : "set droplet.speedtest.ooklaTermsAccepted",
+      "refused" : false,
+      "service" : "preferences"
+    },
+    {
+      "at" : "2026-10-27T21:20:49Z",
+      "detail" : "set droplet.speedtest.useAppleFallback",
+      "refused" : false,
+      "service" : "preferences"
+    },
+    {
+      "at" : "2026-10-27T21:20:49Z",
+      "detail" : "set droplet.speedtest.showHUDOnComplete",
+      "refused" : false,
+      "service" : "preferences"
+    }
   ],
   "artwork" : {
     "creatorAvatar" : "ok",
@@ -14,7 +31,6 @@
     "declared" : [
       "network-client",
       "hud",
-      "shelf-read",
       "shelf-write",
       "clipboard-write"
     ],
@@ -22,7 +38,6 @@
       "clipboard-write",
       "hud",
       "network-client",
-      "shelf-read",
       "shelf-write"
     ]
   },
@@ -30,7 +45,6 @@
     "capabilities" : [
       "network-client",
       "hud",
-      "shelf-read",
       "shelf-write",
       "clipboard-write"
     ],
@@ -44,7 +58,7 @@
     },
     "minAppVersion" : "16.0.1",
     "name" : "Speedtest",
-    "summary" : "Testa nätverkshastigheten med Speedtest by Ookla",
+    "summary" : "Test your internet speed with Speedtest by Ookla",
     "surfaces" : [
       "shelf-widget",
       "live-activity",
@@ -70,9 +84,39 @@
   },
   "log" : [
     {
-      "at" : "2026-10-26T07:47:55Z",
+      "at" : "2026-10-27T21:20:49Z",
       "level" : "info",
       "message" : "Speedtest droplet activated"
+    },
+    {
+      "at" : "2026-10-27T21:20:50Z",
+      "level" : "debug",
+      "message" : "Widget mounted at 440×175, compact: false"
+    },
+    {
+      "at" : "2026-10-27T21:20:50Z",
+      "level" : "debug",
+      "message" : "Widget mounted at 440×175, compact: false"
+    },
+    {
+      "at" : "2026-10-27T21:20:50Z",
+      "level" : "debug",
+      "message" : "Widget mounted at 220×175, compact: true"
+    },
+    {
+      "at" : "2026-10-27T21:20:50Z",
+      "level" : "debug",
+      "message" : "Widget mounted at 220×175, compact: true"
+    },
+    {
+      "at" : "2026-10-27T21:20:50Z",
+      "level" : "debug",
+      "message" : "Widget mounted at 220×175, compact: true"
+    },
+    {
+      "at" : "2026-10-27T21:20:50Z",
+      "level" : "debug",
+      "message" : "Widget mounted at 220×175, compact: true"
     }
   ],
   "manifest" : {
