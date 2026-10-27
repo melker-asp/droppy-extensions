@@ -24,7 +24,7 @@ public final class SpeedtestDroplet: NSObject, ObservableObject, Droplet, HUDPre
     public nonisolated static let id: DropletID = "speedtest"
     public static let widgetID: ShelfWidgetID = "speedtest"
 
-    static let installCommand = "brew tap teamookla/speedtest && brew install speedtest"
+    static let installCommand = "brew tap teamookla/speedtest && brew trust --formula teamookla/speedtest/speedtest && brew install speedtest"
     static let ooklaCLIPage = URL(string: "https://www.speedtest.net/apps/cli")!
     static let ooklaEULA = URL(string: "https://www.speedtest.net/about/eula")!
     static let ooklaTerms = URL(string: "https://www.speedtest.net/about/terms")!

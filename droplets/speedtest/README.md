@@ -6,7 +6,8 @@ A Droplet for [Droppy](https://getdroppy.app), built with
 ## Using it
 
 - Install Ookla's Speedtest CLI with Homebrew:
-  `brew tap teamookla/speedtest && brew install speedtest`.
+  `brew tap teamookla/speedtest && brew trust --formula teamookla/speedtest/speedtest && brew install speedtest`.
+  Homebrew only installs from a tap you trust, which is what the middle step does.
   Speedtest's settings have the command to copy.
 - The first time you run a test, accept Ookla's license and privacy policy, from the
   widget or in Speedtest's settings. Speedtest passes your answer on to the CLI.
