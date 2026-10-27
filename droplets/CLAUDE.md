@@ -98,11 +98,17 @@ So build for the launcher by building a good widget:
   command with lists, forms or arguments that a widget cannot be. It runs in
   Thunderstorm's Node runtime and shares no code with the droplet.
 
-Not yet measured on this Mac: the exact width and height the launcher gives a
-widget, and whether Return reaches the widget's buttons. Speedtest logs
-`Widget mounted at W×H` at debug level on every mount, so open it from Thunderstorm
-once and read the log before relying on a number. Then replace this paragraph with
-what you saw.
+Measured on this Mac (Droppy 16.0.2-nightly, 2026-10-27, Speedtest opened from
+Thunderstorm): the launcher mounts the widget three times in a row, at 0×0, then
+710×209, then 710×217, with `isCompact` false. So the launcher gives about 710pt of
+width, well past Speedtest's 500pt switch, and a height of its own that ignores the
+descriptor's `contentHeight` (Speedtest declares `.fixed(175)`). Lay the wide
+composition out for that height, and ignore a 0×0 pass. With the widget open, the
+launcher's search field keeps the keyboard focus. Whether Return reaches the widget's
+buttons is still unverified. To read a droplet's `host.log.debug` lines, stream them
+while you mount it (`/usr/bin/log stream --level debug --predicate 'process == "Droppy"'`),
+because `log show` does not keep debug lines. In zsh, call `/usr/bin/log`: a bare
+`log` is a shell builtin and prints nothing.
 
 ## Keeping the wiring current
 
